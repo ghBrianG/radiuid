@@ -5,7 +5,12 @@ An application to extract User-to-IP mappings from RADIUS accounting data and se
 
 -----------------------------------------
 ## VERSION
-The version of RadiUID documented here is: **v2.5.0**
+The version of RadiUID documented here is: **v3.0.0**
+
+**Original Author:** John W Kerns (PackeTsar) - All versions through v2.5.0
+**v3.0.0 Maintainer:** Brian Griffith - Python 3 port and continued development
+
+This is a fork of the [original RadiUID project](https://github.com/PackeTsar/radiuid) with Python 3 support and additional features.
 
 
 -----------------------------------------
@@ -20,22 +25,13 @@ The version of RadiUID documented here is: **v2.5.0**
 8. [Command Interface](#command-interface)
 9. [Timeout Tuning](#timeout-tuning)
 10. [The Munge Engine](#the-munge-engine)
-11. [1.1.0 TO 2.0.0 Updates](#updates-in-v110----v200)
-12. [2.0.0 TO 2.0.1 Updates](#updates-in-v200----v201)
-13. [2.0.1 TO 2.1.0 Updates](#updates-in-v201----v210)
-14. [2.1.0 TO 2.2.0 Updates](#updates-in-v210----v220)
-15. [2.2.0 TO 2.2.1 Updates](#updates-in-v220----v221)
-16. [2.2.1 TO 2.3.0 Updates](#updates-in-v221----v230)
-17. [2.3.0 TO 2.3.1 Updates](#updates-in-v230----v231)
-18. [2.3.1 TO 2.3.2 Updates](#updates-in-v231----v232)
-19. [2.3.2 TO 2.4.0 Updates](#updates-in-v232----v240)
-20. [2.4.0 TO 2.4.1 Updates](#updates-in-v240----v241)
-21. [2.4.1 TO 2.4.2 Updates](#updates-in-v241----v242)
-22. [2.4.2 TO 2.4.3 Updates](#updates-in-v242----v243)
-23. [2.4.3 TO 2.5.0 Updates](#updates-in-v243----v250)
-24. [Upgrade Processes](#upgrade-processes)
-25. [Docker Files](#dockerfiles)
-26. [Contributing](#contributing)
+11. [NPS/Windows Log Support](#npswindows-log-support)
+12. [Live Log Processing](#live-log-processing)
+13. [Network Mount Dependencies](#network-mount-dependencies)
+14. [Updates](#updates)
+15. [Upgrade Processes](#upgrade-processes)
+16. [Docker Files](#dockerfiles)
+17. [Contributing](#contributing)
 
 
 -----------------------------------------
@@ -77,11 +73,13 @@ RadiUID runs as a system service on Linux and is very easy to configure and use.
 
 --------------------------------------
 ## REQUIREMENTS
-OS:			**Any modern Debian, RHEL distro (CentOS 6 or 7, Ubuntu 14 or 16...), or Docker container host**
+OS:			**Any modern Debian, RHEL distro (CentOS 7+, Ubuntu 18+, Rocky Linux, AlmaLinux), or Docker container host**
 
-Interpreter:		**Python 2.7.X** *(Also works on Python 2.6.6 and up)*
+Interpreter:		**Python 3.8+** *(Migrated from Python 2.7.X in v3.0.0)*
 
-PAN-OS Version:		**6.X, 7.X, and 8.X have been tested**
+PAN-OS Version:		**6.X, 7.X, 8.X, 9.X, 10.X, and 11.X**
+
+Dependencies:		**None** - Uses only Python standard library
 
 
 --------------------------------------
@@ -123,10 +121,10 @@ NOTE: You need to be logged in as root or have sudo privileges on the system to 
 1. Install OS with appropriate IP and OS settings and update to latest patches (recommended)
 	- Check out the [CentOS Minimal Server - Post-Install Setup][centos-post-install] and the [Ubuntu Server - Post Install Setup][ubuntu-post-install] for help with some of the post-OS-install configuration steps.
 2. Install the Git client (unless you already have the RadiUID files): `sudo yum install git -y` or `sudo apt install git -y`
-3. Clone the RadiUID repo to any location on the box: `git clone https://github.com/PackeTsar/radiuid.git`
+3. Clone the RadiUID repo to any location on the box: `git clone https://github.com/ghBrianG/radiuid.git`
 4. Change to the directory where the RadiUID main code file (radiuid.py) and config file (radiuid.conf) are stored: `cd radiuid`
 	- (OPTIONAL) Change to the development branch (perform this step only if you are prepared for a version which is under active development and may have broken features): `git checkout devX.X.X`
-5. Run the RadiUID program in install mode to perform the installation: `sudo python radiuid.py install`
+5. Run the RadiUID program in install mode to perform the installation: `sudo python3 radiuid.py install`
 	- NOTE: Make sure that you have the .conf file in the same directory as the .py directory for the initial install
 6. Follow the on-screen prompts to install FreeRADIUS and the RadiUID application
 	- The installer should let you know if everything installed correctly and services are running, but in the next section are the CLI commands you can run to check up on it.
@@ -138,7 +136,7 @@ The RadiUID system is meant to run in the background as a system service: consta
 
 Below is the CLI guide for the RadiUID service.
 
-*You can see this guide by typing 'python radiuid.py' (before installation) or 'radiuid' (after installation) and hitting ENTER.*
+*You can see this guide by typing 'python3 radiuid.py' (before installation) or 'radiuid' (after installation) and hitting ENTER.*
 ```
 -------------------------------------------------------------------------------------------------------------------------------
                      ARGUMENTS                    |                                  DESCRIPTIONS
@@ -152,6 +150,7 @@ Below is the CLI guide for the RadiUID service.
 
  - show log                                       |  Show the RadiUID log file
  - show acct-logs                                 |  Show the log files currently in the FreeRADIUS accounting directory
+ - show livelog                                   |  Show current live log processing settings and status
  - show run (xml | set)                           |  Show the RadiUID configuration in XML format (default) or as set commands
  - show config (xml | set)                        |  Show the RadiUID configuration in XML format (default) or as set commands
  - show clients (file | table)                    |  Show the FreeRADIUS clients and config file
@@ -171,6 +170,7 @@ Below is the CLI guide for the RadiUID service.
  - set client (ipv4|ipv6) <ip-block> <secret>     |  Set configuration elements for RADIUS clients to send accounting data FreeRADIUS
  - set munge <rule>.<step> [parameters]           |  Set munge (string processing rules) for User-IDs
  - set target <hostname>:<vsys-id> [parameters]   |  Set configuration elements for existing or new firewall targets
+ - set livelog <option> <value>                   |  Configure live log file processing (file, tracker, enabled)
 -------------------------------------------------------------------------------------------------------------------------------
 
  - push (<hostname>:<vsys-id> | all) [parameters] |  Manually push a User-ID mapping to one or all firewall targets
@@ -181,6 +181,7 @@ Below is the CLI guide for the RadiUID service.
 
  - clear log                                      |  Delete the content in the log file
  - clear acct-logs                                |  Delete the log files currently in the FreeRADIUS accounting directory
+ - clear livelog tracker                          |  Reset the live log position tracker to re-read from beginning
  - clear client (<ip-block> | all)                |  Delete one or all RADIUS client IP blocks in FreeRADIUS config file
  - clear munge (<rule> | all) (<step> | all)      |  Delete one or all munge rules in the config file
  - clear target (<hostname>:<vsys-id> | all)      |  Delete one or all firewall targets in the config file
@@ -194,7 +195,12 @@ Below is the CLI guide for the RadiUID service.
  - service [parameters]                           |  Control the RadiUID and FreeRADIUS system services
 -------------------------------------------------------------------------------------------------------------------------------
 
- - request [parameters]                           |  Make system-level changes for RadiUID service
+ - request xml-update                             |  Update the Python XML.etree modules
+ - request munge-test <string> (debug)            |  Test and debug the Munge Engine using a provided string
+ - request auto-complete                          |  Manually install the RadiUID BASH Auto-Completion feature
+ - request freeradius-install (no-confirm)        |  Manually install the FreeRADIUS service
+ - request reinstall (replace|keep)-config        |  Reinstall RadiUID with or without replacing current configuration
+ - request set-mount (<mount-path> | none)        |  Configure network mount dependency for RadiUID service
 -------------------------------------------------------------------------------------------------------------------------------
 
  - version                                        |  Show the current version of RadiUID and FreeRADIUS
@@ -241,8 +247,118 @@ radiuid set munge 102.10 discard
 
 
 --------------------------------------
+## NPS/WINDOWS LOG SUPPORT
+
+Version 3.0.0 adds support for Windows NPS (Network Policy Server) and IAS log formats in addition to FreeRADIUS accounting logs. RadiUID auto-detects the log format and parses accordingly.
+
+**Supported Formats:**
+
+| Format | Description | Auto-Detection |
+|--------|-------------|----------------|
+| FreeRADIUS | Standard RADIUS accounting logs | Default |
+| NPS XML | Windows NPS XML format (`<Event>` tags) | Detected by `<Event>` |
+| NPS/IAS CSV | Windows NPS comma-separated format | Detected by CSV structure |
+
+**NPS XML Format Example:**
+```xml
+<Event>
+    <User-Name data_type="1">jsmith</User-Name>
+    <SAM-Account-Name data_type="1">DOMAIN\jsmith</SAM-Account-Name>
+    <Framed-IP-Address data_type="3">10.1.50.100</Framed-IP-Address>
+    <Packet-Type data_type="0">4</Packet-Type>
+</Event>
+```
+
+**NPS CSV Format Example:**
+```
+10.1.50.100,jsmith,12/11/2025,17:05:02,IAS,NPS-SERVER,4,1,0,host/PC001,10.1.50.100
+```
+
+**Key Fields:**
+- `User-Name` or `SAM-Account-Name` - Username (domain prefix is extracted)
+- `Framed-IP-Address` - Assigned IP address
+- `Packet-Type` - 4=Accounting-Start, 5=Accounting-Stop
+
+RadiUID will skip records that don't have both a username and IP address.
+
+
+--------------------------------------
+## LIVE LOG PROCESSING
+
+For environments where logs are continuously written to a single file (common with NPS), RadiUID supports "live log" processing. Instead of reading and deleting individual log files, RadiUID tracks its position in the file and processes only new entries.
+
+**Configuration:**
+```bash
+# Set the path to the live log file
+radiuid set livelog file /mnt/logs/nps.log
+
+# Set the path for the position tracker file
+radiuid set livelog tracker /var/lib/radiuid/tracker
+
+# Enable live log processing
+radiuid set livelog enabled on
+
+# View current settings
+radiuid show livelog
+```
+
+**How It Works:**
+1. RadiUID reads from the last known position in the log file
+2. New entries are parsed and processed
+3. The position is saved to the tracker file
+4. On the next loop iteration, only new entries are read
+
+**Reset Tracking:**
+```bash
+# Reset to re-read from beginning of file
+radiuid clear livelog tracker
+```
+
+**Notes:**
+- Live log processing and traditional accounting log processing can run simultaneously
+- The tracker file persists across service restarts
+- If the log file is rotated/truncated, RadiUID detects this and resets to the beginning
+
+
+--------------------------------------
+## NETWORK MOUNT DEPENDENCIES
+
+If your RADIUS/NPS log files are stored on a network share (NFS, CIFS/SMB), you can configure RadiUID to wait for the mount before starting. This prevents the service from failing if the network share isn't available at boot time.
+
+**During Installation:**
+
+The installation wizard will ask if your log files are on a network share and configure the systemd service accordingly.
+
+**After Installation:**
+
+```bash
+# Configure mount dependency
+radiuid request set-mount /mnt/accountinglogs
+
+# Remove mount dependency
+radiuid request set-mount none
+```
+
+**What It Does:**
+
+When configured, the RadiUID systemd service file is updated with:
+- `After=network-online.target mnt-accountinglogs.mount`
+- `Requires=mnt-accountinglogs.mount`
+- `RequiresMountsFor=/mnt/accountinglogs`
+
+This ensures RadiUID only starts after the specified mount point is available.
+
+**Note:** After changing the mount configuration, restart the service:
+```bash
+radiuid service radiuid restart
+```
+
+
+--------------------------------------
 --------------------------------------
 ## Updates
+
+*Note: All versions through v2.5.0 were developed by John W Kerns (PackeTsar). Version 3.0.0 and later are maintained by Brian Griffith.*
 
 
 --------------------------------------
@@ -420,7 +536,82 @@ With the exposure of the `tlsversion` and `radiusstopaction` elements to configu
 
 
 --------------------------------------
+### UPDATES IN V2.5.0 --> V3.0.0
+
+*Maintained by Brian Griffith*
+
+**MAJOR CHANGES:**
+
+- **Python 3 Compatibility**: Complete port from Python 2.7 to Python 3.8+
+  - Updated shebang from `#!/usr/bin/python` to `#!/usr/bin/env python3`
+  - Replaced `urllib2` with `urllib.request`, `urllib.error`, and `urllib.parse`
+  - Replaced `commands` module with `subprocess`
+  - Converted all `print` statements to `print()` functions
+  - Replaced `raw_input()` with `input()`
+  - Changed `.iteritems()` to `.items()` for dictionary iteration
+  - Replaced deprecated `platform.dist()` with `platform.platform()`
+
+- **Modular Package Structure**: Complete refactoring from monolithic script to clean Python package
+  - Organized into logical modules: `core/`, `cli/`, `ui/`, `firewall/`, `installer/`
+  - Type hints throughout for better IDE support and code clarity
+  - Proper dependency injection patterns
+  - Can be installed via pip: `pip install .`
+
+**NEW FEATURES:**
+
+- **NPS/Windows Log Support**: Auto-detection and parsing of Windows NPS log formats
+  - NPS XML format with `<Event>` tags
+  - NPS/IAS CSV format
+  - Automatic format detection based on file content
+
+- **Live Log Processing**: Process continuously-written log files without file deletion
+  - Position tracking for efficient incremental processing
+  - Automatic detection of log rotation/truncation
+  - Configure with `set livelog` commands
+
+- **Network Mount Dependencies**: Configure RadiUID service to wait for network mounts
+  - Systemd service integration with mount units
+  - Configure during installation or with `request set-mount`
+  - Automatic prompt when setting `radiuslogpath` to network location
+
+- **Installation Improvements**:
+  - Python 3.8+ version check during installation
+  - Prefers `dnf` over `yum` for package management
+  - Network mount configuration prompt during wizard
+
+- **Modern Python Packaging**:
+  - `pyproject.toml` for pip installation
+  - pytest test suite
+  - GitHub Actions CI/CD
+  - Pre-commit hooks for code quality
+
+**NOTES:**
+
+- This is a breaking change - Python 2.7 is no longer supported
+- Minimum Python version: 3.8
+- All command examples now use `python3` instead of `python`
+- Zero external dependencies - uses only Python standard library
+- Thoroughly test in your environment before deploying to production
+
+
+--------------------------------------
 ## UPGRADE PROCESSES
+
+**Upgrading from v2.5.0 to v3.0.0:**
+
+1. **Ensure Python 3 is installed**: Check with `python3 --version` (requires Python 3.x)
+2. Perform a `radiuid show config set` command and save the `set` commands displayed in a safe place (just in case)
+3. Download the code from the GitHub repo by using `git clone https://github.com/ghBrianG/radiuid.git`
+    - If the "radiuid" folder already exists, you can use git to update the clone `cd radiuid/; git pull`
+4. Move to the radiuid folder created by git using the `cd radiuid/` command
+5. Change to the latest branch using the command `git checkout v3.0.0`
+6. Perform a quick reinstall/update of RadiUID using the command `python3 radiuid.py request reinstall keep-config`
+7. Type in CONFIRM and hit ENTER to confirm you want to perform the reinstall
+8. Once the installer exits, you should run `radiuid show config set` and see your configuration from before.
+9. Check that you are running the new version by issuing `radiuid version`
+10. Perform a `radiuid service all restart` command to restart RadiUID to use the new app version
+	- *NOTE: The RadiUID service will continue running in the background throughout the install/upgrade process. It is not until you restart/stop the service that the new version and configuration will take effect.*
+11. You may also want to log out of the shell and back in to activate any new auto-complete functions.
 
 **Upgrading from v2.X to v2.5.0:**
 
@@ -429,7 +620,7 @@ With the exposure of the `tlsversion` and `radiusstopaction` elements to configu
     - If the "radiuid" folder already exists, you can use git to update the clone `cd radiuid/; git pull`
 3. Move to the radiuid folder created by git using the `cd radiuid/` command
 4. Change to the latest branch using the command `git checkout v2.5.0`
-5. Perform a quick reinstall/update of RadiUID using the command `python radiuid.py request reinstall keep-config`
+5. Perform a quick reinstall/update of RadiUID using the command `python3 radiuid.py request reinstall keep-config`
 6. Type in CONFIRM and hit ENTER to confirm you want to perform the reinstall
 7. Once the installer exits, you should run `radiuid show config set` and see your configuration from before.
 8. Check that you are running the new version by issuing `radiuid version`
@@ -444,7 +635,7 @@ With the exposure of the `tlsversion` and `radiusstopaction` elements to configu
 3. Download the v2.X.X code from the GitHub repo by using `git clone https://github.com/PackeTsar/radiuid.git`
     - If the "radiuid" folder already exists, you may want to use git to update the clone `cd radiuid/; git pull`
 4. Move to the radiuid folder created by git using the `cd radiuid/` command
-5. Perform a full install of RadiUID using the command `python radiuid.py install`
+5. Perform a full install of RadiUID using the command `python3 radiuid.py install`
 6. Follow the prompts and fill out the appropriate information using the information from the old configuration file
 7. Once the installer exits, you should run `radiuid show config set` and see your configuration.
 8. Perform a `radiuid service all restart` command to restart RadiUID to use the new app version
@@ -471,8 +662,8 @@ These are the dockerfile script files used to build the SSH and non-SSH Docker i
 
     ### Download and install RadiUID from latest release ###
     RUN curl -sL https://codeload.github.com/PackeTsar/radiuid/tar.gz/2.5.0 | tar xz
-    RUN cd radiuid-2.5.0;python radiuid.py request reinstall replace-config no-confirm
-    RUN cd radiuid-2.5.0;python radiuid.py request freeradius-install no-confirm
+    RUN cd radiuid-2.5.0;python3 radiuid.py request reinstall replace-config no-confirm
+    RUN cd radiuid-2.5.0;python3 radiuid.py request freeradius-install no-confirm
 
     ### Expose ports and provide run commands ###
     EXPOSE 1813/udp
@@ -487,8 +678,8 @@ These are the dockerfile script files used to build the SSH and non-SSH Docker i
 
     ### Download and install RadiUID from latest release ###
     RUN curl -sL https://codeload.github.com/PackeTsar/radiuid/tar.gz/2.5.0 | tar xz
-    RUN cd radiuid-2.5.0;python radiuid.py request reinstall replace-config no-confirm
-    RUN cd radiuid-2.5.0;python radiuid.py request freeradius-install no-confirm
+    RUN cd radiuid-2.5.0;python3 radiuid.py request reinstall replace-config no-confirm
+    RUN cd radiuid-2.5.0;python3 radiuid.py request freeradius-install no-confirm
 
     ### Expose ports and provide run commands ###
     EXPOSE 1813/udp
@@ -514,7 +705,9 @@ To build your own Docker image: follow the instructions below
 
 If you would like to help out by contributing code or reporting issues, please do!
 
-Visit the GitHub page (https://github.com/PackeTsar/radiuid) and either report an issue or fork the project, commit some changes, and submit a pull request.
+Visit the GitHub page (https://github.com/ghBrianG/radiuid) and either report an issue or fork the project, commit some changes, and submit a pull request.
+
+**Original Project:** This is a fork of the original RadiUID project by John W Kerns (PackeTsar): https://github.com/PackeTsar/radiuid
 
 [logo]: /radiuid-logo-tiny-100.png
 [all-args]: http://www.packetsar.com/wp-content/uploads/radiuid-all-args.png

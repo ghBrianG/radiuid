@@ -1,0 +1,9 @@
+# RadiUID Requirements
+# ====================
+# RadiUID uses only Python standard library modules.
+# No external dependencies are required for runtime.
+
+# Python version requirement: >= 3.8
+
+# Development dependencies (optional)
+# Install with: pip install -r requirements-dev.txt

@@ -1,0 +1,18 @@
+# RadiUID Development Requirements
+# =================================
+# Install with: pip install -r requirements-dev.txt
+
+# Testing
+pytest>=7.0
+pytest-cov>=4.0
+
+# Type checking
+mypy>=1.0
+
+# Code formatting and linting
+flake8>=6.0
+black>=23.0
+
+# Build tools
+build>=1.0
+twine>=4.0

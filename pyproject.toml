@@ -1,0 +1,112 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "radiuid"
+version = "3.0.0"
+description = "RADIUS to Palo Alto User-ID mapping service"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "John W Kerns", email = "packetsar@gmail.com"}
+]
+maintainers = [
+    {name = "Brian Griffith"}
+]
+keywords = [
+    "radius",
+    "palo-alto",
+    "user-id",
+    "firewall",
+    "freeradius",
+    "nps",
+    "authentication"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Networking :: Firewalls",
+    "Topic :: System :: Systems Administration :: Authentication/Directory",
+]
+requires-python = ">=3.8"
+
+# No external dependencies - uses only Python standard library
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "mypy>=1.0",
+    "flake8>=6.0",
+    "black>=23.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ghBrianG/radiuid"
+Documentation = "https://github.com/ghBrianG/radiuid#readme"
+Repository = "https://github.com/ghBrianG/radiuid.git"
+Issues = "https://github.com/ghBrianG/radiuid/issues"
+"Original Project" = "https://github.com/PackeTsar/radiuid"
+
+[project.scripts]
+radiuid = "radiuid.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["radiuid*"]
+
+[tool.setuptools.package-data]
+radiuid = ["*.conf"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+strict_equality = true
+extra_checks = true
+ignore_missing_imports = true
+
+# Per-module options
+[[tool.mypy.overrides]]
+module = "radiuid.*"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+
+[tool.black]
+line-length = 120
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+
+[tool.flake8]
+max-line-length = 120
+exclude = [".git", "__pycache__", "build", "dist", "*.egg-info"]
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.bandit]
+exclude_dirs = ["tests", "examples"]
+skips = ["B101", "B404", "B603", "B607"]  # Allow assert, subprocess usage
