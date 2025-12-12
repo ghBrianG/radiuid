@@ -4,13 +4,13 @@ Application Context Module
 Centralized state management replacing global variables
 """
 
-import ssl
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from xml.etree import ElementTree
 
-from .system_info import get_system_info, SystemInfo
 from .logging_config import get_logger
+from .system_info import get_system_info, SystemInfo
+from .constants import TLSVersions
 
 logger = get_logger('context')
 
@@ -71,7 +71,7 @@ class RadiUIDConfig:
 
     # UID Settings
     user_domain: Optional[str] = None
-    timeout: int = 60
+    timeout: int = 60  # Minutes until User-ID mapping expires on firewall
 
     # Misc
     loop_time: int = 10
@@ -92,15 +92,19 @@ class RadiUIDConfig:
     live_log_tracker: Optional[str] = None  # Path to position tracker file
     live_log_enabled: bool = False  # Whether to use live log processing
 
+    # NPS CSV parsing settings (0-based column indices)
+    # Set to -1 to enable auto-detection using RADIUS attribute numbers
+    nps_ip_column: int = 0  # Column with IP (or -1 to find attr 8/4108)
+    nps_username_column: int = 1  # Column with username (or -1 to find attr 1/4129)
+    nps_packet_type_column: int = 6  # Column with packet type code
+
+    # Max UIDs per API call
+    max_uids_per_call: int = 50
+
     @property
     def tls_protocol(self) -> Optional[int]:
         """Get SSL protocol constant for the configured TLS version"""
-        tls_map = {
-            "1.0": ssl.PROTOCOL_TLSv1,
-            "1.1": ssl.PROTOCOL_TLSv1_1,
-            "1.2": ssl.PROTOCOL_TLSv1_2,
-        }
-        return tls_map.get(self.tls_version)
+        return TLSVersions.get_protocol(self.tls_version)
 
 
 class AppContext:
@@ -127,6 +131,12 @@ class AppContext:
 
         # Command run format (python radiuid.py vs radiuid)
         self._run_cmd: str = "radiuid"
+
+        # TLS configuration object
+        self.tls_obj: Optional[int] = None
+
+        # Legacy config dict for XML compatibility
+        self._config_dict: Optional[Dict[str, Any]] = None
 
     @classmethod
     def get_instance(cls) -> 'AppContext':
@@ -169,6 +179,16 @@ class AppContext:
     def config_comment(self, value: str) -> None:
         """Set the XML configuration comment block"""
         self._config_comment = value
+
+    @property
+    def config_dict(self) -> Optional[Dict[str, Any]]:
+        """Get the configuration as a dictionary (for legacy compatibility)"""
+        return self._config_dict
+
+    @config_dict.setter
+    def config_dict(self, value: Dict[str, Any]) -> None:
+        """Set the configuration dictionary"""
+        self._config_dict = value
 
     @property
     def is_initialized(self) -> bool:

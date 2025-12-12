@@ -7,7 +7,7 @@ name = "radiuid"
 version = "3.0.0"
 description = "RADIUS to Palo Alto User-ID mapping service"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "John W Kerns", email = "packetsar@gmail.com"}
 ]
@@ -28,7 +28,6 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: System Administrators",
     "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -41,8 +40,9 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 
-# No external dependencies - uses only Python standard library
-dependencies = []
+dependencies = [
+    "pyyaml>=6.0",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -51,6 +51,7 @@ dev = [
     "mypy>=1.0",
     "flake8>=6.0",
     "black>=23.0",
+    "isort>=5.12",
 ]
 
 [project.urls]
@@ -68,7 +69,13 @@ where = ["."]
 include = ["radiuid*"]
 
 [tool.setuptools.package-data]
-radiuid = ["*.conf"]
+radiuid = [
+    "*.conf",
+    "*.yaml",
+    "templates/*.service.template",
+    "templates/*.init",
+    "templates/*.sh",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -76,6 +83,28 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["radiuid"]
+branch = true
+omit = [
+    "radiuid/__main__.py",
+    "*/tests/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+show_missing = true
+precision = 2
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 [tool.mypy]
 python_version = "3.8"
@@ -109,4 +138,4 @@ line_length = 120
 
 [tool.bandit]
 exclude_dirs = ["tests", "examples"]
-skips = ["B101", "B404", "B603", "B607"]  # Allow assert, subprocess usage
+skips = ["B101", "B404", "B603", "B607"]  # Allow asserting, subprocess usage

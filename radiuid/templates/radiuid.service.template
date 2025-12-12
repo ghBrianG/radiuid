@@ -1,0 +1,15 @@
+[Unit]
+Description=RadiUID User-ID Service
+After=network-online.target{mount_after}
+{mount_requires}
+{mount_requires_for}
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /bin/radiuid run
+Restart=on-failure
+RestartSec=10
+User=root
+
+[Install]
+WantedBy=multi-user.target

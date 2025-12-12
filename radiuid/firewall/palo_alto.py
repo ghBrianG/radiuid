@@ -7,14 +7,14 @@ Handles User-ID API calls to Palo Alto Networks firewalls
 import os
 import ssl
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
-import urllib.error
-from typing import List, Dict, Any, Optional, Union, TYPE_CHECKING
+from typing import List, Dict, Optional, Union, TYPE_CHECKING
 
-from ..logging_config import get_logger
-from ..exceptions import FirewallConnectionError, FirewallAPIError
 from ..context import AppContext, get_context, FirewallTarget
+from ..logging_config import get_logger
+from ..constants import TLSVersions
 
 if TYPE_CHECKING:
     from ..ui.interface import UserInterface
@@ -68,19 +68,7 @@ class PaloAltoFirewall:
         if self.context and self.context.config:
             tls_ver = self.context.config.tls_version
             if tls_ver:
-                # Map config values to ssl.TLSVersion enum
-                tls_map = {
-                    '1.0': ssl.TLSVersion.TLSv1,
-                    '1.1': ssl.TLSVersion.TLSv1_1,
-                    '1.2': ssl.TLSVersion.TLSv1_2,
-                    '1.3': ssl.TLSVersion.TLSv1_3,
-                    # Also handle raw protocol numbers
-                    '769': ssl.TLSVersion.TLSv1,      # 0x0301
-                    '770': ssl.TLSVersion.TLSv1_1,    # 0x0302
-                    '771': ssl.TLSVersion.TLSv1_2,    # 0x0303
-                    '772': ssl.TLSVersion.TLSv1_3,    # 0x0304
-                }
-                return tls_map.get(str(tls_ver))
+                return TLSVersions.get_tls_version(tls_ver)
         return None
 
     def _create_ssl_context(self) -> ssl.SSLContext:
@@ -96,8 +84,8 @@ class PaloAltoFirewall:
 
         return context
 
+    @staticmethod
     def xml_formatter_v67(
-        self,
         ipanduserdict: Dict[str, Dict[str, str]],
         targetlist: List[Union[FirewallTarget, Dict[str, str]]],
         userdomain: Optional[str] = None,
@@ -166,8 +154,9 @@ class PaloAltoFirewall:
             finishedxmllist = []
             xmluserdata = ""
 
+            # Palo Alto User-ID API has a limit on UIDs per call (default 50)
+            # Must batch large mappings into multiple API requests
             while hostxmlentries:
-                # Process up to max_uids_per_call entries
                 batch = hostxmlentries[:self.max_uids_per_call]
 
                 for entry in batch:
@@ -186,6 +175,7 @@ class PaloAltoFirewall:
 
                 finishedxmllist.append(urldecoded)
                 urljunk = urllib.parse.quote_plus(urldecoded)
+                # Palo Alto API requires vsysN format (e.g., vsys1) - virtual system ID
                 url = f'https://{hostname}:{port}/api/?key={apikey}&type=user-id&vsys=vsys{vsys}&cmd={urljunk}'
                 finishedurllist.append(url)
                 xmluserdata = ""
@@ -299,7 +289,9 @@ class PaloAltoFirewall:
 
         removelist = []
 
-        # Handle RADIUS stop messages
+        # Handle RADIUS stop messages (user logged out or session ended)
+        # Actions: "clear" = remove from firewall, "ignore" = skip but don't push,
+        #          "push" = push mapping anyway (useful for some auth flows)
         if radiusstopaction == "clear":
             logger.info("Processing RADIUS stop messages: Clearing from firewalls")
             for ip, user_info in list(ipanduserdict.items()):
@@ -467,6 +459,9 @@ class PaloAltoFirewall:
         if targetlist is None:
             targetlist = self.context.targets or []
 
+        # Palo Alto has two separate User-ID caches that must both be cleared:
+        # - user-cache: Data Plane cache (used for traffic forwarding decisions).
+        # - user-cache-mp: Management Plane cache (used for reporting/monitoring).
         if userip == "all":
             encodedcall1 = urllib.parse.quote_plus("<clear><user-cache><all></all></user-cache></clear>")
             encodedcall2 = urllib.parse.quote_plus("<clear><user-cache-mp><all></all></user-cache-mp></clear>")
@@ -504,6 +499,7 @@ class PaloAltoFirewall:
 
 
 # Legacy compatibility - old class name
-class palo_alto_firewall_interaction(PaloAltoFirewall):
+# noinspection PyPep8Naming
+class palo_alto_firewall_interaction(PaloAltoFirewall):  # noqa: N801
     """Legacy alias for PaloAltoFirewall class"""
     pass

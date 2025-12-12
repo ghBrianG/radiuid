@@ -3,8 +3,6 @@
 Tests for DataProcessor class
 """
 
-import pytest
-import os
 from radiuid.core.data_processor import DataProcessor
 
 
@@ -23,53 +21,87 @@ class TestDataProcessor:
         assert "192.168.1.100" in str(cleaned.values())
         assert "10.0.0.1" in str(cleaned.values())
 
-    def test_munge_regex(self, data_processor):
-        """Test munge regex functionality"""
+    def test_munge_match_any(self, data_processor):
+        """Test munge with match-any rule (passes all input through)"""
         users = ["testuser123", "admin456"]
+        # Munge config uses rule-based format with match/step structure
         munge_config = {
-            "regex": {r"\d+": ""}  # Remove numbers
+            "rule101": {
+                "match": {"any": True},
+                "step101.10": {"accept": True}
+            }
+        }
+        result = data_processor.munge(users, munge_config)
+        # With match-any and accept, inputs pass through unchanged
+        assert "testuser123" in result
+        assert "admin456" in result
+
+    def test_munge_discard(self, data_processor):
+        """Test munge discard functionality"""
+        users = ["testuser", "admin"]
+        # Rule that matches 'admin' and discards it
+        munge_config = {
+            "rule101": {
+                "match": {"criterion": "complete", "regex": "admin"},
+                "step101.10": {"discard": True}
+            },
+            "rule102": {
+                "match": {"any": True},
+                "step102.10": {"accept": True}
+            }
         }
         result = data_processor.munge(users, munge_config)
         assert "testuser" in result
-        assert "admin" in result
+        assert "admin" not in result
 
-    def test_munge_prefix(self, data_processor):
-        """Test munge prefix functionality"""
+    def test_munge_set_variable_and_assemble(self, data_processor):
+        """Test munge set-variable and assemble functionality"""
         users = ["testuser"]
+        # Rule that adds a prefix using variables
+        # Note: Step numbers must be unique single numbers for sortlist to work
+        # (sortlist uses only the first number found in each string)
         munge_config = {
-            "prefix": {"value": "DOMAIN\\"}
+            "rule101": {
+                "match": {"any": True},
+                "step10": {
+                    "set-variable": "prefix",
+                    "from-string": "DOMAIN\\"
+                },
+                "step20": {
+                    "set-variable": "username",
+                    "from-match": {}  # Match entire input
+                },
+                "step30": {
+                    "assemble": {
+                        "var1": "prefix",
+                        "var2": "username"
+                    }
+                },
+                "step40": {"accept": True}
+            }
         }
         result = data_processor.munge(users, munge_config)
         assert result[0] == "DOMAIN\\testuser"
 
-    def test_munge_suffix(self, data_processor):
-        """Test munge suffix functionality"""
-        users = ["testuser"]
+    def test_munge_partial_match(self, data_processor):
+        """Test munge with partial match criterion"""
+        users = ["testuser123", "admin456", "guest"]
+        # Rule that matches strings containing digits
         munge_config = {
-            "suffix": {"value": "@domain.com"}
+            "rule101": {
+                "match": {"criterion": "partial", "regex": r"\d+"},
+                "step101.10": {"accept": True}
+            },
+            "rule102": {
+                "match": {"any": True},
+                "step102.10": {"discard": True}
+            }
         }
         result = data_processor.munge(users, munge_config)
-        assert result[0] == "testuser@domain.com"
-
-    def test_munge_lowercase(self, data_processor):
-        """Test munge lowercase functionality"""
-        users = ["TESTUSER", "Admin"]
-        munge_config = {
-            "lowercase": {}
-        }
-        result = data_processor.munge(users, munge_config)
-        assert result[0] == "testuser"
-        assert result[1] == "admin"
-
-    def test_munge_uppercase(self, data_processor):
-        """Test munge uppercase functionality"""
-        users = ["testuser", "Admin"]
-        munge_config = {
-            "uppercase": {}
-        }
-        result = data_processor.munge(users, munge_config)
-        assert result[0] == "TESTUSER"
-        assert result[1] == "ADMIN"
+        # Only users with digits should pass through
+        assert "testuser123" in result
+        assert "admin456" in result
+        assert "guest" not in result
 
 
 class TestLogFormatDetection:
@@ -86,7 +118,7 @@ class TestLogFormatDetection:
         assert format_type == "nps_csv"
 
     def test_detect_nps_mixed_format(self, data_processor, sample_nps_mixed_log):
-        """Test NPS mixed (XML + CSV) format detection"""
+        """Test NPS mixed (XML and CSV) format detection"""
         format_type = data_processor.detect_log_format(sample_nps_mixed_log)
         assert format_type == "nps_csv"
 
@@ -123,7 +155,7 @@ class TestDataProcessorLegacyAlias:
     """Test legacy alias compatibility"""
 
     def test_legacy_import(self):
-        """Test that legacy class name still works"""
+        """Test that the legacy class name still works"""
         from radiuid import data_processing
         dp = data_processing()
         assert isinstance(dp, DataProcessor)

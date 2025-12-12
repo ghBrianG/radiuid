@@ -144,3 +144,17 @@ $RECYCLE.BIN/
 # Backup files
 *.bak
 *.backup
+
+### Project-specific ###
+# Log files (can be large)
+*.log
+examples/*.log
+example/
+
+# Local/personal config files (may contain passwords)
+radiuid.local.yaml
+radiuid.local.conf
+*-mine.yaml
+*-mine.conf
+examples/*-mine.yaml
+examples/*-mine.conf

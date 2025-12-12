@@ -2,7 +2,7 @@
 """
 RadiUID Server v3.0.0
 Originally by John W Kerns
-http://blog.packetsar.com
+https://blog.packetsar.com
 https://github.com/PackeTsar/radiuid
 
 Python 3 Port by Brian Griffith

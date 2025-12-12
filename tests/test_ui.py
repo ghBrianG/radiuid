@@ -3,7 +3,6 @@
 Tests for UserInterface class
 """
 
-import pytest
 from radiuid.ui.interface import UserInterface
 
 

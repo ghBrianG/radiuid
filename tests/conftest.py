@@ -11,7 +11,7 @@ import pytest
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from radiuid.context import AppContext, RadiUIDConfig
+from radiuid.context import AppContext
 from radiuid.ui.interface import UserInterface
 from radiuid.core.data_processor import DataProcessor
 from radiuid.core.file_manager import FileManager

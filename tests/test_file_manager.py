@@ -26,14 +26,14 @@ class TestFileManagerValidation:
 
     def test_validate_ip_cidr(self, file_manager):
         """Test IPv4 CIDR notation validation"""
-        assert file_manager.validate_ip("block", "192.168.1.0/24") is True
-        assert file_manager.validate_ip("block", "10.0.0.0/8") is True
-        assert file_manager.validate_ip("block", "192.168.1.1/32") is True
+        assert file_manager.validate_ip("cidr", "192.168.1.0/24") is True
+        assert file_manager.validate_ip("cidr", "10.0.0.0/8") is True
+        assert file_manager.validate_ip("cidr", "192.168.1.1/32") is True
 
     def test_validate_ip_invalid_cidr(self, file_manager):
         """Test invalid CIDR notation"""
-        assert file_manager.validate_ip("block", "192.168.1.0/33") is False
-        assert file_manager.validate_ip("block", "192.168.1.0/-1") is False
+        assert file_manager.validate_ip("cidr", "192.168.1.0/33") is False
+        assert file_manager.validate_ip("cidr", "192.168.1.0/-1") is False
 
     def test_validate_domain_name_valid(self):
         """Test valid domain name validation"""
@@ -157,21 +157,21 @@ class TestFileManagerFileOperations:
 class TestFileManagerPathUtilities:
     """Test path utility methods"""
 
-    def test_strip_filepath(self, file_manager):
+    def test_split_filepath(self, file_manager):
         """Test extracting directory and filename from path"""
-        directory, filename = file_manager.strip_filepath("/var/log/test.log")
+        directory, filename = file_manager.split_filepath("/var/log/test.log")
         assert directory == "/var/log/"
         assert filename == "test.log"
 
-    def test_strip_filepath_no_directory(self, file_manager):
-        """Test strip_filepath with no directory"""
-        directory, filename = file_manager.strip_filepath("test.log")
+    def test_split_filepath_no_directory(self, file_manager):
+        """Test split_filepath with no directory"""
+        directory, filename = file_manager.split_filepath("test.log")
         assert filename == "test.log"
 
-    def test_directory_slash_add(self, file_manager):
+    def test_ensure_trailing_slash(self, file_manager):
         """Test adding trailing slash to directory"""
-        assert file_manager.directory_slash_add("/var/log") == "/var/log/"
-        assert file_manager.directory_slash_add("/var/log/") == "/var/log/"
+        assert file_manager.ensure_trailing_slash("/var/log") == "/var/log/"
+        assert file_manager.ensure_trailing_slash("/var/log/") == "/var/log/"
 
 
 class TestLiveLogProcessing:
