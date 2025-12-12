@@ -200,6 +200,7 @@ Below is the CLI guide for the RadiUID service.
  - request auto-complete                          |  Manually install the RadiUID BASH Auto-Completion feature
  - request freeradius-install (no-confirm)        |  Manually install the FreeRADIUS service
  - request reinstall (replace|keep)-config        |  Reinstall RadiUID with or without replacing current configuration
+ - request uninstall (keep|remove)-config         |  Uninstall RadiUID from the system
  - request set-mount (<mount-path> | none)        |  Configure network mount dependency for RadiUID service
 -------------------------------------------------------------------------------------------------------------------------------
 
@@ -417,6 +418,8 @@ radiuid service radiuid restart
     - `request xml-update` downloads and installs an update to the xml.etree.ElementTree Python module. This upgrades ElementTree to 1.3.0 which is the minimum version required for RadiUID to run properly. This is only required when running Python 2.6.X.
     - `request reinstall keep-config` performs a reinstall of the RadiUID binary, BASH Auto-Completion feature, RadiUID service, and restarts the service, but leaves the current config file alone to preserve the config during an upgrade. This command is now the preferred way to perform an update of an existing installation of RadiUID.
     - `request reinstall replace-config`performs all of the tasks listed above with the exception that it also replaces the existing configuration (if one exists) with the default config. This command can be used to do a quick net-new install of RadiUID without using the classic installer.
+    - `request uninstall keep-config` completely removes RadiUID from the system (stops and disables the service, removes the binary, service file, and bash completion) but preserves the configuration directory at `/etc/radiuid/` for potential future reinstallation.
+    - `request uninstall remove-config` performs a complete uninstall including removal of all configuration files at `/etc/radiuid/`.
 
 **BUG FIXES:**
 

@@ -27,6 +27,12 @@ def handle(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
         print(" - request reinstall keep-config (no-confirm)                  |     Reinstall RadiUID and KEEP current configuration with default configuration\n")
         return
 
+    # Request uninstall help
+    if arguments in ("request uninstall", "request uninstall ?"):
+        print("\n - request uninstall keep-config (no-confirm)                  |     Uninstall RadiUID but KEEP configuration files")
+        print(" - request uninstall remove-config (no-confirm)                |     Uninstall RadiUID and REMOVE all configuration files\n")
+        return
+
     # Request munge-test help
     if arguments in ("request munge-test", "request munge-test ?"):
         print("\n - request munge-test <string-to-parse> (debug)\n")
@@ -67,6 +73,14 @@ def handle(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
             _request_reinstall_keep(cli, arguments, args_list)
             return
 
+        if cmd == "request uninstall keep-config":
+            _request_uninstall(cli, arguments, args_list, remove_config=False)
+            return
+
+        if cmd == "request uninstall remove-config":
+            _request_uninstall(cli, arguments, args_list, remove_config=True)
+            return
+
 
 def _show_help() -> None:
     """Show help for request commands"""
@@ -75,6 +89,7 @@ def _show_help() -> None:
     print(" - request auto-complete                                         |     Manually install the RadiUID BASH Auto-Completion feature")
     print(" - request freeradius-install (no-confirm)                       |     Manually install the FreeRADIUS service for use by RadiUID")
     print(" - request reinstall (replace-config | keep-config) (no-confirm) |     Reinstall RadiUID with or without replacing the current RadiUID configuration")
+    print(" - request uninstall (keep-config | remove-config) (no-confirm)  |     Uninstall RadiUID from the system")
     print(" - request set-mount (<mount-path> | none)                       |     Configure network mount dependency for RadiUID service\n")
 
 
@@ -290,6 +305,60 @@ def _request_freeradius_install(cli: 'CLIRouter', arguments: str, args_list: Lis
             print(cli.ui.color("\n\n***** Install/Reinstall of FreeRADIUS Cancelled *****\n", cli.ui.yellow))
     else:
         installer.install_freeradius()
+
+    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+
+
+def _request_uninstall(cli: 'CLIRouter', arguments: str, args_list: List[str], remove_config: bool) -> None:
+    """Uninstall RadiUID from the system"""
+    from ...installer.system_setup import SystemInstaller
+
+    confirm = True
+    if len(args_list) > 3 and args_list[3].lower() == "no-confirm":
+        confirm = False
+
+    cli._log_command(arguments)
+
+    header = "########################## RADIUID UNINSTALL ##########################"
+    print(cli.ui.color(header, cli.ui.magenta))
+    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+
+    installer = SystemInstaller(ui=cli.ui)
+
+    config_action = "REMOVE" if remove_config else "KEEP"
+
+    if confirm:
+        print(cli.ui.color(f"\n\n***** Are you sure you want to uninstall RadiUID? *****", cli.ui.yellow))
+        print(cli.ui.color(f"***** Configuration files will be: {config_action}ED *****", cli.ui.yellow))
+
+        if remove_config:
+            print(cli.ui.color("***** WARNING: This will delete /etc/radiuid/ and all configuration! *****", cli.ui.red))
+
+        answer = input(cli.ui.color(">>>>> If you are sure you want to do this, type in 'CONFIRM' and hit ENTER >>>>", cli.ui.yellow))
+
+        if answer.lower() == "confirm":
+            print("\n\n****************Uninstalling RadiUID...****************\n")
+            success = installer.uninstall_radiuid(remove_config=remove_config)
+
+            if success:
+                print(cli.ui.color("\n\n********** RADIUID HAS BEEN UNINSTALLED **********\n", cli.ui.green))
+                if not remove_config:
+                    print(cli.ui.color("Configuration files preserved at /etc/radiuid/", cli.ui.cyan))
+                    print(cli.ui.color("To completely remove, run: rm -rf /etc/radiuid/\n", cli.ui.cyan))
+            else:
+                print(cli.ui.color("\n\n********** UNINSTALL COMPLETED WITH WARNINGS **********\n", cli.ui.yellow))
+                print(cli.ui.color("Some files may not have been removed. Check warnings above.\n", cli.ui.yellow))
+        else:
+            print(cli.ui.color("\n\n***** Uninstall of RadiUID Cancelled *****\n", cli.ui.yellow))
+    else:
+        print("\n\n****************Uninstalling RadiUID...****************\n")
+        success = installer.uninstall_radiuid(remove_config=remove_config)
+
+        if success:
+            print(cli.ui.color("\n\n********** RADIUID HAS BEEN UNINSTALLED **********\n", cli.ui.green))
+        else:
+            print(cli.ui.color("\n\n********** UNINSTALL COMPLETED WITH WARNINGS **********\n", cli.ui.yellow))
 
     print(cli.ui.color("#" * len(header), cli.ui.magenta))
     print(cli.ui.color("#" * len(header), cli.ui.magenta))

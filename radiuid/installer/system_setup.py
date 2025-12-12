@@ -455,6 +455,89 @@ class SystemInstaller:
         except Exception as e:
             print(self.ui.color(f"Failed to install bash completion: {e}", self.ui.red))
 
+    def uninstall_radiuid(self, remove_config: bool = False) -> bool:
+        """
+        Uninstall RadiUID from the system.
+
+        Args:
+            remove_config: Whether to remove configuration files
+
+        Returns:
+            True on success, False on failure
+        """
+        success = True
+
+        # Stop the service first
+        print("Stopping RadiUID service...")
+        self.service_controller.control_service("stop", "radiuid")
+        self.ui.progress("Stopping Service: ", 1)
+
+        # Disable the service
+        print("Disabling RadiUID service...")
+        if self.system_info.has_systemd:
+            os.system('systemctl disable radiuid 2>/dev/null')
+        else:
+            os.system('chkconfig radiuid off 2>/dev/null')
+        self.ui.progress("Disabling Service: ", 1)
+
+        # Remove service file
+        print("Removing service file...")
+        if os.path.exists(self.SYSTEMD_PATH):
+            try:
+                os.remove(self.SYSTEMD_PATH)
+            except OSError as e:
+                print(self.ui.color(f"Warning: Could not remove {self.SYSTEMD_PATH}: {e}", self.ui.yellow))
+                success = False
+
+        if os.path.exists(self.INITD_PATH):
+            try:
+                os.remove(self.INITD_PATH)
+            except OSError as e:
+                print(self.ui.color(f"Warning: Could not remove {self.INITD_PATH}: {e}", self.ui.yellow))
+                success = False
+
+        # Reload systemd
+        if self.system_info.has_systemd:
+            os.system('systemctl daemon-reload')
+        self.ui.progress("Removing Service Files: ", 1)
+
+        # Remove main executable
+        print("Removing RadiUID executable...")
+        bin_path = os.path.join(self.BIN_PATH, "radiuid")
+        if os.path.exists(bin_path):
+            try:
+                os.remove(bin_path)
+            except OSError as e:
+                print(self.ui.color(f"Warning: Could not remove {bin_path}: {e}", self.ui.yellow))
+                success = False
+        self.ui.progress("Removing Executable: ", 1)
+
+        # Remove bash completion
+        print("Removing bash completion...")
+        if os.path.exists(self.BASH_COMPLETION_PATH):
+            try:
+                os.remove(self.BASH_COMPLETION_PATH)
+            except OSError as e:
+                print(self.ui.color(f"Warning: Could not remove {self.BASH_COMPLETION_PATH}: {e}", self.ui.yellow))
+                success = False
+        self.ui.progress("Removing Bash Completion: ", 1)
+
+        # Optionally remove config directory
+        if remove_config:
+            print("Removing configuration files...")
+            if os.path.exists(self.CONFIG_PATH):
+                import shutil
+                try:
+                    shutil.rmtree(self.CONFIG_PATH)
+                except OSError as e:
+                    print(self.ui.color(f"Warning: Could not remove {self.CONFIG_PATH}: {e}", self.ui.yellow))
+                    success = False
+            self.ui.progress("Removing Configuration: ", 1)
+        else:
+            print(self.ui.color(f"Configuration preserved at {self.CONFIG_PATH}", self.ui.cyan))
+
+        return success
+
     def install_freeradius(self) -> str:
         """
         Install FreeRADIUS server.
@@ -525,7 +608,7 @@ _radiuid_complete()
         COMPREPLY=( $(compgen -W "radiuid freeradius all" -- $cur) )
         ;;
       "request")
-        COMPREPLY=( $(compgen -W "xml-update munge-test auto-complete reinstall freeradius-install set-mount" -- $cur) )
+        COMPREPLY=( $(compgen -W "xml-update munge-test auto-complete reinstall uninstall freeradius-install set-mount" -- $cur) )
         ;;
       *)
         ;;
@@ -547,6 +630,11 @@ _radiuid_complete()
       reinstall)
         if [ "$prev2" == "request" ]; then
           COMPREPLY=( $(compgen -W "replace-config keep-config" -- $cur) )
+        fi
+        ;;
+      uninstall)
+        if [ "$prev2" == "request" ]; then
+          COMPREPLY=( $(compgen -W "keep-config remove-config" -- $cur) )
         fi
         ;;
       set-mount)

@@ -144,3 +144,12 @@ $RECYCLE.BIN/
 # Backup files
 *.bak
 *.backup
+
+### Project-specific ###
+# Log files (can be large)
+*.log
+examples/*.log
+example/
+
+# Local config overrides
+radiuid.local.conf
