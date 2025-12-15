@@ -13,7 +13,7 @@ class ConfigurationError(RadiUIDError):
     pass
 
 class FirewallConnectionError(RadiUIDError):
-    """Raised when unable to connect to firewall"""
+    """Raised when unable to connect to the firewall"""
     pass
 
 class FirewallAPIError(RadiUIDError):

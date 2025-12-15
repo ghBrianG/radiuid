@@ -80,7 +80,7 @@ def _push_mapping(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> Non
                     "cli",
                     cli.ui.color("********************* ERROR: Target ", cli.ui.red) +
                     cli.ui.color(f"{hostname}:vsys{vsys}", cli.ui.cyan) +
-                    cli.ui.color(" does not exist in config. Please configure it.********************", cli.ui.red)
+                    cli.ui.color(" does not exist in the config. Please configure it.********************", cli.ui.red)
                 )
                 pushuser = False
 
