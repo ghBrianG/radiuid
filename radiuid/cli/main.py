@@ -4,19 +4,19 @@ CLI Main Module
 Entry point and command router for RadiUID CLI
 """
 
-import sys
 import os
+import sys
 from typing import Optional, List
 
-from ..logging_config import get_logger
-from ..context import AppContext, get_context
 from ..constants import VERSION, TLSVersions
-from ..ui.interface import UserInterface
+from ..context import AppContext, get_context
 from ..core.config_manager import ConfigManager
+from ..core.data_processor import DataProcessor
 from ..core.file_manager import FileManager
 from ..firewall.palo_alto import PaloAltoFirewall
-from ..core.data_processor import DataProcessor
 from ..installer.system_setup import ServiceController
+from ..logging_config import get_logger
+from ..ui.interface import UserInterface
 
 
 class CLIRouter:
@@ -236,6 +236,8 @@ class CLIRouter:
         print(" - show log                                       |  Show the RadiUID log file")
         print(" - show acct-logs                                 |  Show the log files currently in the FreeRADIUS accounting directory")
         print(" - show livelog                                   |  Show the live log file settings (file, tracker, enabled)")
+        print(
+            " - show nps                                       |  Show the NPS CSV column settings (ip, username, packet-type)")
         print(" - show run (xml | set)                           |  Show the RadiUID configuration in XML format (default) or as set commands")
         print(" - show config (xml | set)                        |  Show the RadiUID configuration in XML format (default) or as set commands")
         print(" - show clients (file | table)                    |  Show the FreeRADIUS clients and config file")
@@ -257,6 +259,12 @@ class CLIRouter:
         print(" - set livelog file <path>                        |  Set the path to the live log file (NPS log being actively written)")
         print(" - set livelog tracker <path>                     |  Set the path to the tracker file (stores last read position)")
         print(" - set livelog enabled (true | false)             |  Enable or disable live log processing")
+        print(
+            " - set nps ip-column <number>                     |  Set the CSV column index for IP address (0-indexed, -1 for auto)")
+        print(
+            " - set nps username-column <number>               |  Set the CSV column index for username (0-indexed, -1 for auto)")
+        print(
+            " - set nps packet-type-column <number>            |  Set the CSV column index for packet type (0-indexed)")
         print("-------------------------------------------------------------------------------------------------------------------------------\n")
         print(" - push (<hostname>:<vsys-id> | all) [parameters] |  Manually push a User-ID mapping to one or all firewall targets")
         print("-------------------------------------------------------------------------------------------------------------------------------\n")

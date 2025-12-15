@@ -78,6 +78,11 @@ def handle(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
         _show_livelog(cli, arguments)
         return
 
+    # Show NPS CSV settings
+    if arguments == "show nps":
+        _show_nps(cli, arguments)
+        return
+
     # Show mappings with target
     if cli.cat_list(args_list[:2]) == "show mappings" and len(args_list) > 2:
         if re.findall(r"^[0-9A-Za-z]", args_list[2]):
@@ -90,6 +95,8 @@ def _show_help(_cli: 'CLIRouter') -> None:
     print("\n - show log                                                  |     Show the RadiUID log file")
     print(" - show acct-logs                                            |     Show the log files currently in the FreeRADIUS accounting directory")
     print(" - show livelog                                              |     Show the live log file settings (file, tracker, enabled)")
+    print(
+        " - show nps                                                  |     Show the NPS CSV column settings (ip, username, packet-type)")
     print(" - show run (xml | set)                                      |     Show the RadiUID configuration in XML format (default) or as set commands")
     print(" - show config (xml | set)                                   |     Show the RadiUID configuration in XML format (default) or as set commands")
     print(" - show clients (file | table)                               |     Show the FreeRADIUS client config file")
@@ -370,6 +377,34 @@ def _show_livelog(cli: 'CLIRouter', arguments: str) -> None:
     print(f"  Tracker File:       {live_log_tracker}")
     print(f"  Tracker Position:   {tracker_position} bytes")
     print(f"  Enabled:            {cli.ui.color(enabled_text, enabled_color)}")
+    print("\n")
+
+    print_footer(cli, header)
+
+
+def _show_nps(cli: 'CLIRouter', arguments: str) -> None:
+    """Show NPS CSV column settings"""
+    cli._log_command(arguments)
+
+    header = print_header(cli, "NPS CSV COLUMN SETTINGS")
+    print("\n")
+
+    config = cli.context.config
+
+    # Get NPS CSV settings
+    ip_column = config.nps_ip_column
+    username_column = config.nps_username_column
+    packet_type_column = config.nps_packet_type_column
+
+    # Display settings
+    ip_mode = "(auto-detect)" if ip_column == -1 else ""
+    username_mode = "(auto-detect)" if username_column == -1 else ""
+
+    print(f"  IP Column:          {ip_column} {ip_mode}")
+    print(f"  Username Column:    {username_column} {username_mode}")
+    print(f"  Packet Type Column: {packet_type_column}")
+    print("\n")
+    print("  Note: Columns are 0-indexed. Set to -1 for auto-detection.")
     print("\n")
 
     print_footer(cli, header)
