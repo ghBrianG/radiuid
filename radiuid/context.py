@@ -4,13 +4,13 @@ Application Context Module
 Centralized state management replacing global variables
 """
 
-import ssl
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from xml.etree import ElementTree
 
 from .logging_config import get_logger
 from .system_info import get_system_info, SystemInfo
+from .constants import TLSVersions
 
 logger = get_logger('context')
 
@@ -104,12 +104,7 @@ class RadiUIDConfig:
     @property
     def tls_protocol(self) -> Optional[int]:
         """Get SSL protocol constant for the configured TLS version"""
-        tls_map = {
-            "1.0": ssl.PROTOCOL_TLSv1,
-            "1.1": ssl.PROTOCOL_TLSv1_1,
-            "1.2": ssl.PROTOCOL_TLSv1_2,
-        }
-        return tls_map.get(self.tls_version)
+        return TLSVersions.get_protocol(self.tls_version)
 
 
 class AppContext:
@@ -136,6 +131,12 @@ class AppContext:
 
         # Command run format (python radiuid.py vs radiuid)
         self._run_cmd: str = "radiuid"
+
+        # TLS configuration object
+        self.tls_obj: Optional[int] = None
+
+        # Legacy config dict for XML compatibility
+        self._config_dict: Optional[Dict[str, Any]] = None
 
     @classmethod
     def get_instance(cls) -> 'AppContext':
@@ -178,6 +179,16 @@ class AppContext:
     def config_comment(self, value: str) -> None:
         """Set the XML configuration comment block"""
         self._config_comment = value
+
+    @property
+    def config_dict(self) -> Optional[Dict[str, Any]]:
+        """Get the configuration as a dictionary (for legacy compatibility)"""
+        return self._config_dict
+
+    @config_dict.setter
+    def config_dict(self, value: Dict[str, Any]) -> None:
+        """Set the configuration dictionary"""
+        self._config_dict = value
 
     @property
     def is_initialized(self) -> bool:

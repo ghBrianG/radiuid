@@ -7,6 +7,8 @@ Handles 'tail' CLI commands for RadiUID
 import os
 from typing import TYPE_CHECKING, List
 
+from .helpers import print_header, print_footer
+
 if TYPE_CHECKING:
     from ..main import CLIRouter
 
@@ -29,9 +31,7 @@ def _tail_log(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     cli._log_command(arguments)
     logfile = cli.context.config.log_file
 
-    header = f"########################## OUTPUT FROM FILE {logfile} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"OUTPUT FROM FILE {logfile}")
 
     if len(args_list) == 2:
         os.system(f"tail -fn 25 {logfile}")
@@ -42,8 +42,7 @@ def _tail_log(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
         except ValueError:
             cli.file_manager.log_write(
                 "cli",
-                cli.ui.color(f"****************FATAL: '{args_list[2]}' is a bad input for number of lines. Please input a number****************", cli.ui.red)
+                cli.ui.color(f"****************FATAL: '{args_list[2]}' is invalid input for the number of lines. Please enter a number****************", cli.ui.red)
             )
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)

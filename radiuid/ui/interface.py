@@ -7,7 +7,7 @@ Handles terminal output, colors, progress bars, and user interaction
 import sys
 import time
 import re
-from typing import List, Dict, Any
+from typing import List, Dict
 
 from ..constants import Colors
 
@@ -86,6 +86,8 @@ class UserInterface:
                 return "yes"
             else:
                 print(self.color("'Yes' or 'No' dude...", self.red))
+
+        return "no"  # Default fallback (should never reach here)
 
     def make_table(self, columnorder: List[str], tabledata: List[Dict[str, str]]) -> str:
         """

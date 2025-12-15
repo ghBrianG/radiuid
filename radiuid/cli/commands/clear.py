@@ -8,6 +8,8 @@ import os
 import time
 from typing import TYPE_CHECKING, List
 
+from .helpers import print_header, print_footer
+
 if TYPE_CHECKING:
     from ..main import CLIRouter
 
@@ -114,9 +116,7 @@ def _clear_acct_logs(cli: 'CLIRouter', arguments: str) -> None:
     cli._log_command(arguments)
     radiuslogpath = cli.context.config.radius_log_path
 
-    header = f"########################## EXECUTING COMMAND: {arguments} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
     print("\n")
 
     filelist = cli.file_manager.list_files(radiuslogpath)
@@ -137,17 +137,14 @@ def _clear_acct_logs(cli: 'CLIRouter', arguments: str) -> None:
         print(cli.ui.color("***** Nothing to do *****", cli.ui.red))
 
     print("\n")
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _clear_client(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     """Clear FreeRADIUS client(s)"""
     cli._log_command(arguments)
 
-    header = f"########################## EXECUTING COMMAND: {arguments} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     if args_list[2] == "all":
         print("\n")
@@ -187,8 +184,7 @@ def _clear_client(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> Non
                 cli.file_manager.log_write("cli", cli.ui.color(f"**************** {args_list[2]} does not exist as a current client IP block ****************", cli.ui.yellow))
                 cli.print_failure()
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _clear_munge_all(cli: 'CLIRouter', arguments: str) -> None:
@@ -196,14 +192,12 @@ def _clear_munge_all(cli: 'CLIRouter', arguments: str) -> None:
     cli._log_command(arguments)
     configfile = cli.context.config.config_file
 
-    header = f"########################## EXECUTING COMMAND: {arguments} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
     print("\n\n")
     print(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   **************** Removing all munge configuration ****************\n")
 
     if cli.config_manager.get_config_item('munge') is None:
-        print("\n" + cli.ui.color(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************ERROR: No munge configuration currently exist in config****************\n", cli.ui.red))
+        print("\n" + cli.ui.color(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************ERROR: No munge configuration currently exists in the config****************\n", cli.ui.red))
     else:
         print(f"\n{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************Deleting configuration items: ****************\n")
         cli.config_manager.show_config_item('xml', "none", 'munge')
@@ -213,8 +207,7 @@ def _clear_munge_all(cli: 'CLIRouter', arguments: str) -> None:
 
     print("\n")
     cli.print_success()
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _clear_munge(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
@@ -222,12 +215,12 @@ def _clear_munge(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None
     cli._log_command(arguments)
     configfile = cli.context.config.config_file
 
-    header = f"########################## EXECUTING COMMAND: {arguments} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     itemexists = False
     config_dict = cli.context.config_dict
+    rule = ""
+    step = ""
 
     if len(args_list) >= 3:
         rulelist = []
@@ -239,7 +232,7 @@ def _clear_munge(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None
                 for rulename in munge.keys():
                     rulelist.append(rulename)
         except KeyError:
-            print("\n" + cli.ui.color(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************ERROR: No munge configuration currently exist in config****************\n", cli.ui.red))
+            print("\n" + cli.ui.color(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************ERROR: No munge configuration currently exists in the config****************\n", cli.ui.red))
 
         if args_list[2] in rulelist:
             itemexists = True
@@ -287,8 +280,7 @@ def _clear_munge(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None
             print("\n")
             cli.print_failure()
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _clear_target_all(cli: 'CLIRouter', arguments: str) -> None:
@@ -296,12 +288,10 @@ def _clear_target_all(cli: 'CLIRouter', arguments: str) -> None:
     cli._log_command(arguments)
     configfile = cli.context.config.config_file
 
-    header = f"########################## EXECUTING COMMAND: {arguments} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     if cli.config_manager.get_config_item('target') is None:
-        print("\n" + cli.ui.color(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************ERROR: No targets currently exist in config****************\n", cli.ui.red))
+        print("\n" + cli.ui.color(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************ERROR: No targets currently exist in the config****************\n", cli.ui.red))
     else:
         print(f"\n{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************Deleting configuration items: ****************\n")
         cli.config_manager.show_config_item('xml', "none", 'targets')
@@ -314,18 +304,15 @@ def _clear_target_all(cli: 'CLIRouter', arguments: str) -> None:
         else:
             cli.print_failure()
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _clear_target(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
-    """Clear specific firewall target"""
+    """Clear the specific firewall target"""
     cli._log_command(arguments)
     configfile = cli.context.config.config_file
 
-    header = f"########################## EXECUTING COMMAND: {arguments} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     targetexists = False
 
@@ -359,17 +346,14 @@ def _clear_target(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> Non
     except (NameError, AttributeError):
         print("\n" + cli.ui.color(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************ERROR: No targets currently exist in config****************\n", cli.ui.red))
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _clear_mappings(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     """Clear IP-to-User mappings"""
     cli._log_command(arguments)
 
-    header = f"########################## EXECUTING COMMAND: {arguments} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     # Parse hostname and vsys
     if ":" in args_list[2]:
@@ -406,7 +390,7 @@ def _clear_mappings(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> N
                     "cli",
                     cli.ui.color("********************* ERROR: Target ", cli.ui.red) +
                     cli.ui.color(f"{hostname}:vsys{vsys}", cli.ui.cyan) +
-                    cli.ui.color(" does not exist in config. Please configure it.********************", cli.ui.red)
+                    cli.ui.color(" does not exist in the config. Please configure it.********************", cli.ui.red)
                 )
 
     if keepgoing:
@@ -451,17 +435,14 @@ def _clear_mappings(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> N
     else:
         cli.print_failure()
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _clear_livelog_tracker(cli: 'CLIRouter', arguments: str) -> None:
-    """Clear live log tracker file to re-read from beginning"""
+    """Clear the live log tracker file to re-read from the beginning"""
     cli._log_command(arguments)
 
-    header = f"########################## EXECUTING COMMAND: {arguments} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
     print("\n")
 
     tracker_file = cli.context.config.live_log_tracker
@@ -475,7 +456,7 @@ def _clear_livelog_tracker(cli: 'CLIRouter', arguments: str) -> None:
         print("Nothing to clear - live log will be read from the beginning.\n")
         cli.print_success()
     else:
-        # Show current position
+        # Show the current position
         try:
             with open(tracker_file, 'r') as f:
                 current_pos = f.read().strip() or "0"
@@ -497,5 +478,4 @@ def _clear_livelog_tracker(cli: 'CLIRouter', arguments: str) -> None:
             print(cli.ui.color(f"\nError removing tracker file: {e}", cli.ui.red))
             cli.print_failure()
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)

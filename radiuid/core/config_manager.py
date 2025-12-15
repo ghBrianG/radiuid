@@ -76,7 +76,8 @@ class ConfigManager:
         self.ui = ui or UserInterface()
         self._config_data: Dict[str, Any] = {}
 
-    def find_config_file(self, preferred: str = None, alternate: str = None) -> str:
+    @staticmethod
+    def find_config_file(preferred: str = None, alternate: str = None) -> str:
         """
         Locate the configuration file.
 
@@ -784,7 +785,7 @@ class ConfigManager:
             if logging_elem is not None:
                 if logging_elem.find('maxloglines') is not None:
                     text = logging_elem.find('maxloglines').text
-                    config['logging']['max_log_lines'] = int(text) if text else 0
+                    config['logging']['max_log_lines'] = str(int(text)) if text else '0'
 
             # UID Settings
             uid = gs.find('uidsettings')
@@ -793,7 +794,7 @@ class ConfigManager:
                     config['uid_settings']['user_domain'] = uid.find('userdomain').text or ''
                 if uid.find('timeout') is not None:
                     text = uid.find('timeout').text
-                    config['uid_settings']['timeout'] = int(text) if text else 60
+                    config['uid_settings']['timeout'] = str(int(text)) if text else '60'
 
             # Search Terms
             st = gs.find('searchterms')
@@ -810,7 +811,7 @@ class ConfigManager:
             if misc is not None:
                 if misc.find('looptime') is not None:
                     text = misc.find('looptime').text
-                    config['misc']['loop_time'] = int(text) if text else 10
+                    config['misc']['loop_time'] = str(int(text)) if text else '10'
                 if misc.find('tlsversion') is not None:
                     config['misc']['tls_version'] = misc.find('tlsversion').text or '1.2'
                 if misc.find('radiusstopaction') is not None:
@@ -821,7 +822,7 @@ class ConfigManager:
             if livelog is not None:
                 if livelog.find('enabled') is not None:
                     text = livelog.find('enabled').text or 'false'
-                    config['livelog']['enabled'] = text.lower() in ('true', '1', 'yes', 'on')
+                    config['livelog']['enabled'] = 'true' if text.lower() in ('true', '1', 'yes', 'on') else 'false'
                 if livelog.find('file') is not None:
                     config['livelog']['file'] = livelog.find('file').text
                 if livelog.find('tracker') is not None:
@@ -859,7 +860,8 @@ class ConfigManager:
 
         return config
 
-    def _migrate_munge_xml(self, munge_elem) -> Dict[str, Any]:
+    @staticmethod
+    def _migrate_munge_xml(munge_elem) -> Dict[str, Any]:
         """Migrate munge XML element to dictionary."""
         munge_dict = {}
 

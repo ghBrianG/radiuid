@@ -6,6 +6,8 @@ Handles all 'service' CLI commands for RadiUID
 
 from typing import TYPE_CHECKING, List
 
+from .helpers import print_service_block
+
 if TYPE_CHECKING:
     from ..main import CLIRouter
 
@@ -122,14 +124,7 @@ def _service_radiuid_start(cli: 'CLIRouter', arguments: str) -> None:
     """Start RadiUID service"""
     cli._log_command(arguments)
     svcctloutput = cli.service_controller.control_service("start", "radiuid")
-
-    header = "########################## STARTING RADIUID ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-
+    print_service_block(cli, "STARTING RADIUID", svcctloutput.get("after", ""))
     _print_service_result(cli, "radiuid", "start", svcctloutput)
 
 
@@ -140,14 +135,7 @@ def _service_radiuid_stop(cli: 'CLIRouter', arguments: str) -> None:
     input(cli.ui.color("\n\nHit CTRL-C to quit. Hit ENTER to continue\n>>>>>", cli.ui.cyan))
 
     svcctloutput = cli.service_controller.control_service("stop", "radiuid")
-
-    header = "########################## STOPPING RADIUID ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-
+    print_service_block(cli, "STOPPING RADIUID", svcctloutput.get("after", ""))
     _print_service_result(cli, "radiuid", "stop", svcctloutput)
 
 
@@ -159,22 +147,12 @@ def _service_radiuid_restart(cli: 'CLIRouter', arguments: str) -> None:
 
     # Stop
     svcctloutput = cli.service_controller.control_service("stop", "radiuid")
-    header = "########################## STOPPING RADIUID ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_service_block(cli, "STOPPING RADIUID", svcctloutput.get("after", ""))
     _print_service_result(cli, "radiuid", "stop", svcctloutput)
 
     # Start
     svcctloutput = cli.service_controller.control_service("start", "radiuid")
-    header = "########################## STARTING RADIUID ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_service_block(cli, "STARTING RADIUID", svcctloutput.get("after", ""))
     _print_service_result(cli, "radiuid", "restart", svcctloutput)
 
 
@@ -183,14 +161,7 @@ def _service_freeradius_start(cli: 'CLIRouter', arguments: str) -> None:
     cli._log_command(arguments)
     radservicename = _get_rad_service_name(cli)
     svcctloutput = cli.service_controller.control_service("start", radservicename)
-
-    header = "########################## STARTING FREERADIUS ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-
+    print_service_block(cli, "STARTING FREERADIUS", svcctloutput.get("after", ""))
     _print_service_result(cli, "freeradius", "start", svcctloutput)
 
 
@@ -202,14 +173,7 @@ def _service_freeradius_stop(cli: 'CLIRouter', arguments: str) -> None:
 
     radservicename = _get_rad_service_name(cli)
     svcctloutput = cli.service_controller.control_service("stop", radservicename)
-
-    header = "########################## STOPPING FREERADIUS ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-
+    print_service_block(cli, "STOPPING FREERADIUS", svcctloutput.get("after", ""))
     _print_service_result(cli, "freeradius", "stop", svcctloutput)
 
 
@@ -223,22 +187,12 @@ def _service_freeradius_restart(cli: 'CLIRouter', arguments: str) -> None:
 
     # Stop
     svcctloutput = cli.service_controller.control_service("stop", radservicename)
-    header = "########################## STOPPING FREERADIUS ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_service_block(cli, "STOPPING FREERADIUS", svcctloutput.get("after", ""))
     _print_service_result(cli, "freeradius", "stop", svcctloutput)
 
     # Start
     svcctloutput = cli.service_controller.control_service("start", radservicename)
-    header = "########################## STARTING FREERADIUS ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_service_block(cli, "STARTING FREERADIUS", svcctloutput.get("after", ""))
     _print_service_result(cli, "freeradius", "restart", svcctloutput)
 
 
@@ -248,23 +202,13 @@ def _service_all_start(cli: 'CLIRouter', arguments: str) -> None:
 
     # Start RadiUID
     svcctloutput = cli.service_controller.control_service("start", "radiuid")
-    header = "########################## STARTING RADIUID ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_service_block(cli, "STARTING RADIUID", svcctloutput.get("after", ""))
     _print_service_result(cli, "radiuid", "start", svcctloutput)
 
     # Start FreeRADIUS
     radservicename = _get_rad_service_name(cli)
     svcctloutput = cli.service_controller.control_service("start", radservicename)
-    header = "########################## STARTING FREERADIUS ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_service_block(cli, "STARTING FREERADIUS", svcctloutput.get("after", ""))
     _print_service_result(cli, "freeradius", "start", svcctloutput)
 
 
@@ -276,23 +220,13 @@ def _service_all_stop(cli: 'CLIRouter', arguments: str) -> None:
 
     # Stop RadiUID
     svcctloutput = cli.service_controller.control_service("stop", "radiuid")
-    header = "########################## STOPPING RADIUID ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_service_block(cli, "STOPPING RADIUID", svcctloutput.get("after", ""))
     _print_service_result(cli, "radiuid", "stop", svcctloutput)
 
     # Stop FreeRADIUS
     radservicename = _get_rad_service_name(cli)
     svcctloutput = cli.service_controller.control_service("stop", radservicename)
-    header = "########################## STOPPING FREERADIUS ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_service_block(cli, "STOPPING FREERADIUS", svcctloutput.get("after", ""))
     _print_service_result(cli, "freeradius", "stop", svcctloutput)
 
 
@@ -306,40 +240,20 @@ def _service_all_restart(cli: 'CLIRouter', arguments: str) -> None:
 
     # Stop RadiUID
     svcctloutput = cli.service_controller.control_service("stop", "radiuid")
-    header = "########################## STOPPING RADIUID ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_service_block(cli, "STOPPING RADIUID", svcctloutput.get("after", ""))
     _print_service_result(cli, "radiuid", "stop", svcctloutput)
 
     # Stop FreeRADIUS
     svcctloutput = cli.service_controller.control_service("stop", radservicename)
-    header = "########################## STOPPING FREERADIUS ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_service_block(cli, "STOPPING FREERADIUS", svcctloutput.get("after", ""))
     _print_service_result(cli, "freeradius", "stop", svcctloutput)
 
     # Start RadiUID
     svcctloutput = cli.service_controller.control_service("start", "radiuid")
-    header = "########################## STARTING RADIUID ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_service_block(cli, "STARTING RADIUID", svcctloutput.get("after", ""))
     _print_service_result(cli, "radiuid", "restart", svcctloutput)
 
     # Start FreeRADIUS
     svcctloutput = cli.service_controller.control_service("start", radservicename)
-    header = "########################## STARTING FREERADIUS ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(svcctloutput.get("after", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_service_block(cli, "STARTING FREERADIUS", svcctloutput.get("after", ""))
     _print_service_result(cli, "freeradius", "restart", svcctloutput)

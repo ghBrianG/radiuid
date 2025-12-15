@@ -45,7 +45,7 @@ class FileManager:
     @staticmethod
     def ensure_trailing_slash(path: str) -> str:
         """
-        Ensure directory path ends with '/'.
+        Ensure the directory path ends with '/'.
 
         Args:
             path: Directory path
@@ -74,7 +74,7 @@ class FileManager:
             dir_path = FileManager.ensure_trailing_slash(dir_path)
             return dir_path, filename
         else:
-            # File is in root directory
+            # File is in the root directory.
             return "/", filepath.replace("/", "")
 
     # ============================================================
@@ -148,7 +148,7 @@ class FileManager:
         result = {'status': 'pass', 'messages': []}
 
         # Check for legal characters (RFC883, RFC952, plus underscore for AD domains)
-        if not re.match(r"^[a-zA-Z0-9\-\.\_]+$", domain):
+        if not re.match(r"^[a-zA-Z0-9\-._]+$", domain):
             result['status'] = 'fail'
             result['messages'].append("Illegal character found. Only a-z, A-Z, 0-9, period (.), hyphen (-), and underscore (_) allowed.")
             return result
@@ -175,12 +175,12 @@ class FileManager:
             result['messages'].append("Last character must be alphanumeric")
 
         # Check for labels starting/ending with hyphens
-        if re.search(r"\.\-|\-\.", domain):
+        if re.search(r"\.-|-\.", domain):
             result['status'] = 'fail'
             result['messages'].append("Labels cannot start or end with hyphens")
 
         # Check for double periods or triple hyphens
-        if re.search(r"\.\.|\-\-\-", domain):
+        if re.search(r"\.\.|---", domain):
             result['status'] = 'fail'
             result['messages'].append("No double periods (..) or triple hyphens (---) allowed")
 
@@ -199,7 +199,7 @@ class FileManager:
         """
         result = {'status': 'fail', 'messages': []}
 
-        if re.match(r"^[a-zA-Z0-9_\.]+$", username):
+        if re.match(r"^[a-zA-Z0-9_.]+$", username):
             result['status'] = 'pass'
             result['messages'].append("Username is valid")
         else:
@@ -394,7 +394,6 @@ class FileManager:
             if submode == "scrub":
                 if checkdict[target_name]["status"] == "fail":
                     # Remove the bad target from context.targets
-                    target_index = 0
                     for i, t in enumerate(targets):
                         target_id = f"{t.hostname}:vsys{t.vsys}"
                         if target_id == target_name:
@@ -474,7 +473,7 @@ class FileManager:
             filepath: Path to file
 
         Returns:
-            True if file exists
+            True if the file exists
         """
         return os.path.isfile(filepath)
 
@@ -487,7 +486,7 @@ class FileManager:
             dirpath: Path to directory
 
         Returns:
-            True if directory exists
+            True if the directory exists
         """
         return os.path.isdir(dirpath)
 
@@ -537,14 +536,14 @@ class FileManager:
         dest_path = os.path.join(copy_path, filename)
 
         if os.path.isfile(dest_path):
-            # Append to existing file
+            # Append to the existing file.
             logger.info(f"Appending {source_file} to {dest_path}")
             with open(source_file, 'r') as src:
                 with open(dest_path, 'a') as dst:
                     dst.write("\n\n")
                     dst.write(src.read())
         else:
-            # Copy new file
+            # Copy the new file.
             logger.info(f"Copying {source_file} to {copy_path}")
             shutil.copy2(source_file, copy_path)
 
@@ -627,32 +626,32 @@ class FileManager:
         # Get the last processed position
         last_pos = self._get_tracker_position(tracker_file)
 
-        # Get current file size
+        # Get the current file size
         current_size = os.path.getsize(live_log)
 
-        # Check if file was truncated/rotated (size smaller than last position)
+        # Check if the file was truncated/rotated (size smaller than the last position).
         if current_size < last_pos:
             logger.info(f"Live log file appears to have been rotated (size {current_size} < last pos {last_pos}). Resetting position.")
             last_pos = 0
 
-        # Check if there's new content
+        # Check if there's new content.
         if current_size <= last_pos:
             logger.debug(f"No new content in live log (size={current_size}, last_pos={last_pos})")
             return None
 
-        # Extract new content
+        # Extract the new content.
         new_content = self._extract_from_position(live_log, last_pos)
 
         if not new_content or not new_content.strip():
             logger.debug("No new content extracted from live log")
             return None
 
-        # Write to dated output file
+        # Write to a dated output file.
         timestamp = int(time.time())
         base_name = os.path.basename(live_log).replace('.log', '').replace('.xml', '')
         output_file = os.path.join(output_dir, f"{base_name}-{timestamp}.log")
 
-        # Ensure output directory exists
+        # Ensure the output directory exists.
         os.makedirs(output_dir, exist_ok=True)
 
         with open(output_file, 'w') as f:
@@ -660,12 +659,13 @@ class FileManager:
 
         logger.info(f"Extracted {len(new_content)} bytes from live log to {output_file}")
 
-        # Update tracker position
+        # Update the tracker position.
         self._set_tracker_position(tracker_file, current_size)
 
         return output_file
 
-    def _get_tracker_position(self, tracker_file: str) -> int:
+    @staticmethod
+    def _get_tracker_position(tracker_file: str) -> int:
         """
         Get the last processed byte position from the tracker file.
 
@@ -673,10 +673,10 @@ class FileManager:
             tracker_file: Path to position tracker file
 
         Returns:
-            Last processed byte position (0 if file doesn't exist)
+            Last processed byte position (0 if the file doesn't exist)
         """
         try:
-            # Ensure tracker directory exists
+            # Ensure the tracker directory exists.
             tracker_dir = os.path.dirname(tracker_file)
             if tracker_dir and not os.path.exists(tracker_dir):
                 os.makedirs(tracker_dir, exist_ok=True)
@@ -691,7 +691,8 @@ class FileManager:
 
         return 0
 
-    def _set_tracker_position(self, tracker_file: str, position: int) -> None:
+    @staticmethod
+    def _set_tracker_position(tracker_file: str, position: int) -> None:
         """
         Save the current byte position to the tracker file.
 
@@ -700,7 +701,7 @@ class FileManager:
             position: Current byte position
         """
         try:
-            # Ensure tracker directory exists
+            # Ensure the tracker directory exists.
             tracker_dir = os.path.dirname(tracker_file)
             if tracker_dir and not os.path.exists(tracker_dir):
                 os.makedirs(tracker_dir, exist_ok=True)
@@ -710,7 +711,8 @@ class FileManager:
         except IOError as e:
             logger.error(f"Error writing tracker file {tracker_file}: {e}")
 
-    def _extract_from_position(self, filepath: str, start_pos: int) -> str:
+    @staticmethod
+    def _extract_from_position(filepath: str, start_pos: int) -> str:
         """
         Extract content from a file starting at a byte position.
 
@@ -753,7 +755,7 @@ class FileManager:
             if mode == "normal":
                 print(f"{timestamp}:   {message}")
 
-            # Trim log if needed
+            # Trim the log if needed.
             max_lines = self.context.config.max_log_lines
             if max_lines > 0:
                 self.trim_log_file(log_file, max_lines)
@@ -761,12 +763,13 @@ class FileManager:
         except IOError as e:
             print(self.ui.color(f"Cannot write to log file {log_file}: {e}", self.ui.red))
 
-    def trim_log_file(self, filepath: str, max_lines: int) -> Dict[str, Any]:
+    @staticmethod
+    def trim_log_file(filepath: str, max_lines: int) -> Dict[str, Any]:
         """
         Trim a log file to maximum line count.
 
         Args:
-            filepath: Path to log file
+            filepath: Path to the log file
             max_lines: Maximum lines to keep
 
         Returns:
@@ -779,7 +782,7 @@ class FileManager:
                 lines = f.readlines()
 
             if len(lines) > max_lines:
-                # Keep only the last max_lines
+                # Keep only the last max_lines.
                 lines_to_remove = len(lines) - max_lines
                 new_lines = lines[lines_to_remove:]
 
@@ -802,34 +805,50 @@ class FileManager:
     # FreeRADIUS Client Configuration
     # ============================================================
 
-    def get_freeradius_clients(self) -> List[Dict[str, str]]:
+    def _read_client_config(self) -> Tuple[List[str], int, Optional[str]]:
         """
-        Get list of RadiUID-configured FreeRADIUS clients.
+        Read FreeRADIUS client config and find the RadiUID section.
 
         Returns:
-            List of client dictionaries with 'ip_block', 'secret', 'family'
+            Tuple of (lines, section_start_index, error_message)
+            section_start_index is -1 if the section not found
+            error_message is None on success
         """
         client_path = self.context.system_info.client_config_path
-        result = []
 
         try:
             with open(client_path, 'r') as f:
                 lines = f.readlines()
         except IOError:
-            logger.warning(f"Cannot read {client_path}")
-            return result
+            return [], -1, f"Cannot read {client_path}"
 
         # Find RadiUID section
-        start_line = -1
+        section_start = -1
         for i, line in enumerate(lines):
             if line == self.RADIUID_SECTION_MARKER:
-                start_line = i
+                section_start = i
                 break
+
+        return lines, section_start, None
+
+    def get_freeradius_clients(self) -> List[Dict[str, str]]:
+        """
+        Get the list of RadiUID-configured FreeRADIUS clients.
+
+        Returns:
+            List of client dictionaries with 'ip_block', 'secret', 'family'
+        """
+        result = []
+        lines, start_line, error = self._read_client_config()
+
+        if error:
+            logger.warning(error)
+            return result
 
         if start_line < 0:
             return result
 
-        # Parse client entries after the header
+        # Parse client entries after the header.
         client_lines = lines[start_line + 2:]  # Skip marker and warning
         i = 0
 
@@ -837,10 +856,10 @@ class FileManager:
             line = client_lines[i].strip()
 
             if line.startswith('client '):
-                # Extract IP block from client line
+                # Extract the IP block from the client line.
                 ip_block = line.replace('client ', '').replace(' {', '')
 
-                # Look for ipvXaddr and secret in next lines
+                # Look for ipvXaddr and secret in the next lines.
                 family = 'ipv4'
                 secret = ''
 
@@ -864,7 +883,7 @@ class FileManager:
                     'family': family
                 })
 
-                i += 5  # Skip to next client block
+                i += 5  # Skip to the next client block
             else:
                 i += 1
 
@@ -882,28 +901,18 @@ class FileManager:
         Returns:
             'SUCCESS' or error message
         """
-        client_path = self.context.system_info.client_config_path
+        lines, section_start, error = self._read_client_config()
 
-        try:
-            with open(client_path, 'r') as f:
-                lines = f.readlines()
-        except IOError:
-            return f"FATAL: Cannot read {client_path}"
-
-        # Find or create RadiUID section
-        section_start = -1
-        for i, line in enumerate(lines):
-            if line == self.RADIUID_SECTION_MARKER:
-                section_start = i
-                break
+        if error:
+            return f"FATAL: {error}"
 
         if section_start < 0:
-            # Add section header
+            # Add the section header.
             lines.append("\n")
             lines.append(self.RADIUID_SECTION_MARKER)
             lines.append(self.RADIUID_SECTION_WARNING)
 
-        # Build client entry
+        # Build the client entry.
         addr_type = 'ipv4addr' if family == 'ipv4' else 'ipv6addr'
         client_entry = [
             '\n',
@@ -916,6 +925,7 @@ class FileManager:
 
         lines.extend(client_entry)
 
+        client_path = self.context.system_info.client_config_path
         try:
             with open(client_path, 'w') as f:
                 f.writelines(lines)
@@ -933,21 +943,19 @@ class FileManager:
         Returns:
             'SUCCESS' or error message
         """
-        client_path = self.context.system_info.client_config_path
-
         if ip_block.lower() == 'all':
             return self.clear_freeradius_clients()
 
         # Get current clients
         current_clients = self.get_freeradius_clients()
 
-        # Filter out the one to remove
+        # Filter out the one to remove.
         new_clients = [c for c in current_clients if c['ip_block'] != ip_block]
 
         if len(new_clients) == len(current_clients):
             return f"Client {ip_block} not found"
 
-        # Clear and re-add
+        # Clear and re-add.
         self.clear_freeradius_clients()
         for client in new_clients:
             self.add_freeradius_client(client['ip_block'], client['secret'], client['family'])
@@ -961,27 +969,18 @@ class FileManager:
         Returns:
             'SUCCESS' or error message
         """
-        client_path = self.context.system_info.client_config_path
+        lines, section_start, error = self._read_client_config()
 
-        try:
-            with open(client_path, 'r') as f:
-                lines = f.readlines()
-        except IOError:
-            return f"FATAL: Cannot read {client_path}"
-
-        # Find RadiUID section
-        section_start = -1
-        for i, line in enumerate(lines):
-            if line == self.RADIUID_SECTION_MARKER:
-                section_start = i
-                break
+        if error:
+            return f"FATAL: {error}"
 
         if section_start < 0:
             return "SUCCESS"  # Nothing to clear
 
-        # Keep only lines before RadiUID section
+        # Keep only the lines before the RadiUID section.
         new_lines = lines[:section_start]
 
+        client_path = self.context.system_info.client_config_path
         try:
             with open(client_path, 'w') as f:
                 f.writelines(new_lines)
@@ -991,7 +990,7 @@ class FileManager:
 
     def get_freeradius_clients_raw(self) -> str:
         """
-        Get raw text of RadiUID section in clients.conf.
+        Get raw text of the RadiUID section in clients.conf.
 
         Returns:
             Raw text content

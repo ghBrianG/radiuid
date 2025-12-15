@@ -28,8 +28,8 @@ class InstallationWizard:
         self.ui = UserInterface()
         self.config_manager = ConfigManager(self.context, self.ui)
         self.file_manager = FileManager(self.context, self.ui)
-        self.service_controller = ServiceController(self.context)
-        self.installer = SystemInstaller(self.context)
+        self.service_controller = ServiceController(self.context.system_info)
+        self.installer = SystemInstaller(self.context.system_info)
 
     def run(self) -> None:
         """Run the installation wizard"""
@@ -54,8 +54,8 @@ class InstallationWizard:
               '\n' + '                       ##########################################################'
               '\n' + '                       ##########################################################'
               '\n' + '                       ##########       Written by John W Kerns        ##########'
-              '\n' + '                       ##########      http://blog.packetsar.com       ##########'
-              '\n' + '                       ########## https://github.com/PackeTsar/radiuid ##########'
+              '\n' + '                       ##########      https://blog.packetsar.com       ##########'
+                     '\n' + '                       ########## https://github.com/PackeTsar/radiuid ##########'
               '\n' + '                       ##########################################################'
               '\n' + '                       ##########################################################'
               '\n' + '                       ##########################################################')
@@ -140,14 +140,14 @@ class InstallationWizard:
 
         if radiuidreinstall == 'yes':
             print("\n\n****************Installing the RadiUID service...****************\n")
-            self.installer.copy_radiuid("replace-config")
+            self.installer.copy_radiuid_files(replace_config=True)
 
             # Ask about network mount dependency
             mount_point = self._ask_network_mount()
 
             self.installer.install_service(mount_point=mount_point)
             print("\n")
-            self.installer.install_radiuid_completion()
+            self.installer.install_bash_completion()
             input(self.ui.color(">>>>> You will need to log out and log back in to activate the RadiUID CLI auto-completion functionality\n>>>>>", self.ui.cyan))
             print("\n\n****************We will start up the RadiUID service once we configure the .conf file****************\n")
 
@@ -218,6 +218,7 @@ class InstallationWizard:
         self.ui.progress('Reading:', 1)
 
         targets = self.context.targets or []
+        target_dicts: List[Dict[str, str]] = []
         if targets:
             self.file_manager.scrub_targets("noisy", "scrub")
             target_dicts = [{"hostname": t.hostname, "vsys": t.vsys, "username": t.username, "password": t.password} for t in targets]
@@ -236,8 +237,8 @@ class InstallationWizard:
             newtargets = []
             while anothertarget == 'yes':
                 print("\n\n\n")
-                addhostname = self._change_setting('192.168.1.1', 'Enter the IP ADDRESS or HOSTNAME of the target firewall to recieve User-ID mappings')
-                addvsys = self._change_setting('vsys1', 'Enter the Virtual System ID of the target firewall to recieve User-ID mappings').replace("vsys", "")
+                addhostname = self._change_setting('192.168.1.1', 'Enter the IP ADDRESS or HOSTNAME of the target firewall to receive User-ID mappings')
+                addvsys = self._change_setting('vsys1', 'Enter the Virtual System ID of the target firewall to receive User-ID mappings').replace("vsys", "")
                 addusername = self._change_setting('admin', 'Enter the administrative USERNAME to use for authentication against the firewall')
                 addpassword = self._change_setting('admin', 'Enter the PASSWORD for the username you just entered')
                 newtargets.append({'hostname': addhostname, 'vsys': addvsys, 'username': addusername, 'password': addpassword})
@@ -258,9 +259,9 @@ class InstallationWizard:
         self.config_manager.set_config_item('timeout', newtimeout)
 
         # Apply target settings
-        self.config_manager.clear_targets()
-        if newtargets:
-            self.config_manager.add_target(newtargets)
+        self.config_manager.clear_all_targets()
+        for target in newtargets:
+            self.config_manager.add_target(target)
 
         # Show config
         self.config_manager.show_config_item('xml', "none", 'config')
@@ -276,7 +277,7 @@ class InstallationWizard:
             self.ui.progress('Applying:', 1)
             self.config_manager.save()
 
-            newlogfiledir = self.file_manager.strip_filepath(newlogfile)[0]
+            newlogfiledir = self.file_manager.split_filepath(newlogfile)[0]
             print(f"\n\n****************Creating log directory: {newlogfiledir}****************\n")
             os.system(f'mkdir -p {newlogfiledir}')
 
@@ -288,7 +289,7 @@ class InstallationWizard:
                 input(self.ui.color(">>>>> Hit ENTER to continue...\n\n>>>>>", self.ui.cyan))
             else:
                 print(self.ui.color("***** Something went wrong. Looks like the installation or startup failed... ", self.ui.red))
-                print(self.ui.color("***** Please make sure you are installing RadiUID on a support platform", self.ui.red))
+                print(self.ui.color("***** Please make sure you are installing RadiUID on a supported platform", self.ui.red))
                 print(self.ui.color("***** You can manually edit the RadiUID config file by entering 'radiuid edit config' in the CLI", self.ui.red))
                 input(self.ui.color("Hit ENTER to quit the program...\n\n>>>>>", self.ui.cyan))
                 quit()
@@ -329,7 +330,7 @@ class InstallationWizard:
 
     def _ask_network_mount(self) -> Optional[str]:
         """
-        Ask if log files are on a network share and get mount point.
+        Ask if log files are on a network share and get the mount point.
 
         Returns:
             Mount point path (e.g., /mnt/accountinglogs) or None if not using network mount
@@ -393,5 +394,9 @@ class InstallationWizard:
         else:
             print("\n\n****************Applying client settings to FreeRADIUS config...****************\n")
             for client in clients:
-                self.file_manager.edit_freeradius_client("append", [client])
+                self.file_manager.add_freeradius_client(
+                    ip_block=client['IP Block'],
+                    secret=client['Shared Secret'],
+                    family=client['Family']
+                )
             print(self.ui.color("***** Client settings applied successfully!", self.ui.green))

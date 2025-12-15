@@ -27,12 +27,12 @@ class SystemInfo:
 
     @property
     def has_systemd(self) -> bool:
-        """Check if system uses systemd"""
+        """Check if the system uses systemd"""
         if self._systemd is None:
             try:
                 status, output = subprocess.getstatusoutput("systemctl")
                 self._systemd = len(output) > 50 and "Operation not permitted" not in output
-            except Exception as e:
+            except (OSError, subprocess.SubprocessError) as e:
                 logger.debug(f"Error checking systemd: {e}")
                 self._systemd = False
         return self._systemd
@@ -49,7 +49,7 @@ class SystemInfo:
                         self._pkg_manager = mgr
                         logger.debug(f"Found package manager: {mgr}")
                         break
-                except Exception:
+                except (OSError, subprocess.SubprocessError):
                     pass
 
             if self._pkg_manager is None:
@@ -74,13 +74,13 @@ class SystemInfo:
                         if "stopped" in output:
                             check_results[1000] = name
                         check_results[len(output) - len(name)] = name
-                except Exception:
+                except (OSError, subprocess.SubprocessError):
                     pass
 
             if len(check_results) < 2:
                 self._radius_service = "uninstalled"
             else:
-                # Return the one with longest output
+                # Return the one with the longest output
                 self._radius_service = check_results[max(check_results.keys())]
 
         return self._radius_service
@@ -96,7 +96,7 @@ class SystemInfo:
                 try:
                     status, output = subprocess.getstatusoutput(f"ls {path}")
                     check_results[status] = path
-                except Exception:
+                except (OSError, subprocess.SubprocessError):
                     pass
 
             self._client_config_path = check_results.get(0, Paths.RADDB_CLIENTS)
@@ -110,7 +110,7 @@ class SystemInfo:
             try:
                 status, output = subprocess.getstatusoutput("ls /.dockerenv")
                 self._in_container = "No such" not in output
-            except Exception:
+            except (OSError, subprocess.SubprocessError):
                 self._in_container = False
 
         return self._in_container
@@ -123,7 +123,7 @@ class SystemInfo:
                 self._os_version = platform.platform()
                 if self.in_container:
                     self._os_version += " (Docker Container)"
-            except Exception:
+            except OSError:
                 self._os_version = platform.system()
 
         return self._os_version

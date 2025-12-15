@@ -9,6 +9,8 @@ import re
 import time
 from typing import TYPE_CHECKING, List
 
+from .helpers import print_header, print_footer
+
 if TYPE_CHECKING:
     from ..main import CLIRouter
 
@@ -165,14 +167,6 @@ def _show_munge_help() -> None:
     print("                                        |              set munge 2.4 assemble dngr slsh user")
 
 
-def _print_header(cli: 'CLIRouter', arguments: str) -> str:
-    """Print command header and return it"""
-    header = f"########################## EXECUTING COMMAND: {arguments} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    return header
-
-
 def _prompt_network_mount(cli: 'CLIRouter', path: str) -> None:
     """Prompt user if the path is on a network mount and configure service dependency"""
     from ...installer.system_setup import SystemInstaller
@@ -181,7 +175,7 @@ def _prompt_network_mount(cli: 'CLIRouter', path: str) -> None:
     answer = cli.ui.yesorno("Configure RadiUID service to wait for mount before starting?")
 
     if answer == 'yes':
-        # Extract the mount point from the path (usually the first or second directory)
+        # Extract the mount point from the path (usually the first or second directory).
         # e.g., /mnt/accountinglogs/server1/ -> /mnt/accountinglogs
         path_parts = path.strip('/').split('/')
         if len(path_parts) >= 2:
@@ -193,12 +187,12 @@ def _prompt_network_mount(cli: 'CLIRouter', path: str) -> None:
         if not mount_point:
             mount_point = default_mount
 
-        # Validate mount path
+        # Validate the mount path
         if not mount_point.startswith('/'):
             print(cli.ui.color(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************ERROR: Mount path must be an absolute path starting with /****************", cli.ui.red))
             return
 
-        # Convert to systemd mount unit name for display
+        # Convert to systemd mount unit name for display.
         mount_unit = mount_point.strip('/').replace('/', '-') + '.mount'
 
         print(cli.ui.color(f"\n{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************Configuring service to wait for mount: {mount_point}****************", cli.ui.yellow))
@@ -210,16 +204,10 @@ def _prompt_network_mount(cli: 'CLIRouter', path: str) -> None:
         print(cli.ui.color(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************Mount dependency configured. Run 'service radiuid restart' to apply.****************\n", cli.ui.green))
 
 
-def _print_footer(cli: 'CLIRouter', header: str) -> None:
-    """Print command footer"""
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-
-
 def _set_logfile(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
-    """Set logfile path"""
+    """Set the logfile path"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     value = args_list[2]
     configfile = cli.context.config.config_file
@@ -251,13 +239,13 @@ def _set_logfile(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None
         else:
             cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _set_maxloglines(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     """Set max log lines"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     value = args_list[2]
     configfile = cli.context.config.config_file
@@ -284,13 +272,13 @@ def _set_maxloglines(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> 
         else:
             cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _set_radiuslogpath(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     """Set RADIUS log path"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     value = args_list[2]
     configfile = cli.context.config.config_file
@@ -321,13 +309,13 @@ def _set_radiuslogpath(cli: 'CLIRouter', arguments: str, args_list: List[str]) -
         else:
             cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _set_acctlogcopypath(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     """Set accounting log copy path"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     value = args_list[2]
     configfile = cli.context.config.config_file
@@ -362,13 +350,13 @@ def _set_acctlogcopypath(cli: 'CLIRouter', arguments: str, args_list: List[str])
         else:
             cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _set_xmloutputpath(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
-    """Set XML output path"""
+    """Set the XML output path"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     value = args_list[2]
     configfile = cli.context.config.config_file
@@ -403,13 +391,13 @@ def _set_xmloutputpath(cli: 'CLIRouter', arguments: str, args_list: List[str]) -
         else:
             cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _set_userdomain(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     """Set user domain"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     entereduserdomain = args_list[2]
     configfile = cli.context.config.config_file
@@ -442,13 +430,13 @@ def _set_userdomain(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> N
         else:
             cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _set_timeout(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     """Set timeout"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     value = args_list[2]
     configfile = cli.context.config.config_file
@@ -476,13 +464,13 @@ def _set_timeout(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None
     except ValueError:
         print("\n" + cli.ui.color(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   ****************ERROR: Timeout value must be a number between 1 and 1440****************\n", cli.ui.red))
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _set_looptime(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     """Set loop time"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     value = args_list[2]
     configfile = cli.context.config.config_file
@@ -507,13 +495,13 @@ def _set_looptime(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> Non
         else:
             cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _set_tlsversion(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     """Set TLS version"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     value = args_list[2].lower()
     configfile = cli.context.config.config_file
@@ -533,13 +521,13 @@ def _set_tlsversion(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> N
         else:
             cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _set_radiusstopaction(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     """Set RADIUS stop action"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     value = args_list[2].lower()
     configfile = cli.context.config.config_file
@@ -559,13 +547,13 @@ def _set_radiusstopaction(cli: 'CLIRouter', arguments: str, args_list: List[str]
         else:
             cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _set_client(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     """Set FreeRADIUS client"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     family = args_list[2]
 
@@ -596,13 +584,13 @@ def _set_client(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
         print("\n")
         cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _set_target(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
-    """Set firewall target"""
+    """Set the firewall target"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     configfile = cli.context.config.config_file
 
@@ -719,7 +707,7 @@ def _set_target(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     else:
         cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _set_munge(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
@@ -729,6 +717,9 @@ def _set_munge(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
              "\n                                        |              assemble <variable name> <variable name> ... "\
              "\n                                        |              accept"\
              "\n                                        |              discard"
+
+    rulenum = ""
+    stepnum = ""
 
     try:
         if "." in args_list[2]:
@@ -786,14 +777,14 @@ def _set_munge(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
 
     # Process valid munge commands
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
     configfile = cli.context.config.config_file
 
     rule = 'rule' + rulenum
     step = 'step' + stepnum
     action = args_list[3] if len(args_list) > 3 else ""
 
-    # Check that initial match statement exists for non-zero steps
+    # Check that the initial match statement exists for non-zero steps
     if stepnum != "0":
         keepgoing = False
         config_dict = cli.context.config_dict
@@ -868,7 +859,7 @@ def _set_munge(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     else:
         cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)
 
 
 def _show_livelog_help() -> None:
@@ -887,7 +878,7 @@ def _show_livelog_help() -> None:
 def _set_livelog(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
     """Set live log settings"""
     cli._log_command(arguments)
-    header = _print_header(cli, arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     keepgoing = True
 
@@ -899,7 +890,7 @@ def _set_livelog(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None
         value = args_list[3]
 
         if option == "file":
-            # Validate file path
+            # Validate the file path
             pathcheck = cli.file_manager.validate_path("file", value)
             if pathcheck["status"] == "fail":
                 for error in pathcheck.get("errors", []):
@@ -911,7 +902,7 @@ def _set_livelog(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None
                 print(f"\nLive log file set to: {value}")
 
         elif option == "tracker":
-            # Validate tracker file path
+            # Validate the tracker file path
             pathcheck = cli.file_manager.validate_path("file", value)
             if pathcheck["status"] == "fail":
                 for error in pathcheck.get("errors", []):
@@ -944,4 +935,4 @@ def _set_livelog(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None
     else:
         cli.print_failure()
 
-    _print_footer(cli, header)
+    print_footer(cli, header)

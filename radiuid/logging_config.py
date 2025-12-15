@@ -41,7 +41,7 @@ class ColoredFormatter(logging.Formatter):
 def setup_logging(
     log_file: Optional[str] = None,
     level: int = logging.INFO,
-        _max_log_lines: int = 0  # Reserved for future circular logging implementation
+    max_log_lines: int = 0  # Reserved for future circular logging implementation
 ) -> logging.Logger:
     """
     Configure logging for RadiUID
@@ -54,6 +54,7 @@ def setup_logging(
     Returns:
         Configured logger instance
     """
+    _ = max_log_lines  # Reserved for future use
     logger = logging.getLogger('radiuid')
     logger.setLevel(level)
 

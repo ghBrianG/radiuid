@@ -12,6 +12,7 @@ mypy>=1.0
 # Code formatting and linting
 flake8>=6.0
 black>=23.0
+isort>=5.12
 
 # Build tools
 build>=1.0

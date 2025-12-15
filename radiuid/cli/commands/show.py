@@ -9,6 +9,8 @@ import re
 from typing import TYPE_CHECKING, List
 from xml.etree import ElementTree
 
+from .helpers import print_header, print_footer
+
 if TYPE_CHECKING:
     from ..main import CLIRouter
 
@@ -129,21 +131,16 @@ def _show_log(cli: 'CLIRouter', arguments: str) -> None:
     """Show RadiUID log file"""
     cli._log_command(arguments)
     logfile = cli.context.config.log_file
-    header = f"########################## OUTPUT FROM FILE {logfile} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"OUTPUT FROM FILE {logfile}")
     os.system(f"more {logfile}")
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _show_acct_logs(cli: 'CLIRouter', arguments: str) -> None:
     """Show FreeRADIUS accounting log files"""
     cli._log_command(arguments)
     radiuslogpath = cli.context.config.radius_log_path
-    header = f"########################## FILES IN DIRECTORY {radiuslogpath} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"FILES IN DIRECTORY {radiuslogpath}")
     print("\n")
     filelist = cli.file_manager.list_files(radiuslogpath)
     if len(filelist) > 0:
@@ -152,8 +149,7 @@ def _show_acct_logs(cli: 'CLIRouter', arguments: str) -> None:
     else:
         print(cli.ui.color(f"***** Directory {radiuslogpath} is currently empty *****", cli.ui.red))
     print("\n")
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _show_config_set(cli: 'CLIRouter', arguments: str) -> None:
@@ -161,12 +157,9 @@ def _show_config_set(cli: 'CLIRouter', arguments: str) -> None:
     cli._log_command(arguments)
     print(cli.ui.color("NOTE:", cli.ui.cyan) + f"  Use command '{cli.ui.color(cli.runcmd + ' show config xml', cli.ui.green)}' to see configuration in XML format\n")
     configfile = cli.context.config.config_file
-    header = f"########################## OUTPUT FROM FILE {configfile} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"OUTPUT FROM FILE {configfile}")
     print(cli.config_manager.show_config_item('set', "auto", 'config'))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _show_config_xml(cli: 'CLIRouter', arguments: str) -> None:
@@ -174,9 +167,7 @@ def _show_config_xml(cli: 'CLIRouter', arguments: str) -> None:
     cli._log_command(arguments)
     print(cli.ui.color("NOTE:", cli.ui.cyan) + f"  Use command '{cli.ui.color(cli.runcmd + ' show config set', cli.ui.green)}' to see configuration in form of CLI commands\n")
     configfile = cli.context.config.config_file
-    header = f"########################## OUTPUT FROM FILE {configfile} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"OUTPUT FROM FILE {configfile}")
     print("\n")
     print("###############################################################")
     print("################### Main RadiUID XML Config ###################")
@@ -199,16 +190,13 @@ def _show_config_xml(cli: 'CLIRouter', arguments: str) -> None:
         print(cli.ui.color("********** FreeRADIUS config file doesn't exist **********", cli.ui.yellow))
         print("\n")
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _show_clients_table(cli: 'CLIRouter', arguments: str) -> None:
     """Show FreeRADIUS clients as table"""
     cli._log_command(arguments)
-    header = "########################## CURRENT FREERADIUS RADIUS CLIENTS ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, "CURRENT FREERADIUS RADIUS CLIENTS")
     print("\n")
 
     clientinfo = cli.file_manager.get_freeradius_clients()
@@ -221,20 +209,16 @@ def _show_clients_table(cli: 'CLIRouter', arguments: str) -> None:
         print("\n\n")
         cli.print_success()
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _show_clients_file(cli: 'CLIRouter', arguments: str) -> None:
     """Show FreeRADIUS clients config file"""
     cli._log_command(arguments)
     clientconfpath = cli.context.config.client_conf_path
-    header = f"########################## OUTPUT FROM FILE {clientconfpath} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"OUTPUT FROM FILE {clientconfpath}")
     os.system(f"more {clientconfpath}")
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _show_status(cli: 'CLIRouter', arguments: str) -> None:
@@ -247,12 +231,9 @@ def _show_status(cli: 'CLIRouter', arguments: str) -> None:
     freeradius_status = cli.service_controller.control_service("status", radservicename)
 
     # RadiUID check
-    header = "########################## CHECKING RADIUID ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, "CHECKING RADIUID")
     print(radiuid_status.get("action", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
     status = radiuid_status.get("status", "")
     if status == "not-found":
@@ -263,12 +244,9 @@ def _show_status(cli: 'CLIRouter', arguments: str) -> None:
         print(cli.ui.color("\n\n********** RADIUID IS CURRENTLY NOT RUNNING **********\n\n", cli.ui.yellow))
 
     # FreeRADIUS check
-    header = "########################## CHECKING FREERADIUS ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, "CHECKING FREERADIUS")
     print(freeradius_status.get("action", ""))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
     status = freeradius_status.get("status", "")
     if status == "not-found":
@@ -283,9 +261,7 @@ def _show_mappings(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> No
     """Show IP-to-User mappings for targets"""
     cli._log_command(arguments)
 
-    header = f"########################## EXECUTING COMMAND: {arguments} ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
 
     # Parse hostname and vsys
     if ":" in args_list[2]:
@@ -313,7 +289,7 @@ def _show_mappings(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> No
                 "cli",
                 cli.ui.color("********************* ERROR: Target ", cli.ui.red) +
                 cli.ui.color(args_list[2], cli.ui.cyan) +
-                cli.ui.color(" does not exist in config. Please configure it.********************", cli.ui.red)
+                cli.ui.color(" does not exist in the config. Please configure it.********************", cli.ui.red)
             )
             pulluids = False
 
@@ -351,17 +327,14 @@ def _show_mappings(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> No
     else:
         cli.print_failure()
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _show_livelog(cli: 'CLIRouter', arguments: str) -> None:
     """Show live log file settings"""
     cli._log_command(arguments)
 
-    header = "########################## LIVE LOG SETTINGS ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, "LIVE LOG SETTINGS")
     print("\n")
 
     config = cli.context.config
@@ -399,5 +372,4 @@ def _show_livelog(cli: 'CLIRouter', arguments: str) -> None:
     print(f"  Enabled:            {cli.ui.color(enabled_text, enabled_color)}")
     print("\n")
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)

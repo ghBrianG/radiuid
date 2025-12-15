@@ -7,6 +7,7 @@ Handles all 'request' CLI commands for RadiUID
 from typing import TYPE_CHECKING, List
 
 from ...constants import VERSION
+from .helpers import print_header, print_footer
 
 if TYPE_CHECKING:
     from ..main import CLIRouter
@@ -102,9 +103,7 @@ def _request_munge_test(cli: 'CLIRouter', _arguments: str, args_list: List[str])
         except (NameError, AttributeError):
             pass
 
-    header = "########################## MUNGE TEST ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, "MUNGE TEST")
 
     try:
         mungeconfig = cli.context.munge_config
@@ -122,42 +121,35 @@ def _request_munge_test(cli: 'CLIRouter', _arguments: str, args_list: List[str])
         print(cli.ui.color("\n\nNo string returned by Munge Engine. It was discarded", cli.ui.yellow))
 
     print("\n\n")
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _request_xml_update(cli: 'CLIRouter', _arguments: str) -> None:
     """Update XML ETree modules"""
     from ...installer.system_setup import SystemInstaller
 
-    header = "########################## XML ETREE UPDATE ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, "XML ETREE UPDATE")
     print(cli.ui.color("\n\n***** This will download and install Python XML ETree module 1.3.0 from the PackeTsar site *****", cli.ui.yellow))
     input(cli.ui.color(">>>>> Hit CTRL-C to cancel or ENTER to confirm >>>>", cli.ui.yellow))
 
     installer = SystemInstaller(cli.context)
     installer.update_xml_etree()
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _request_auto_complete(cli: 'CLIRouter', _arguments: str) -> None:
     """Install bash auto-completion"""
     from ...installer.system_setup import SystemInstaller
 
-    header = "########################## AUTO-COMPLETE INSTALL ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, "AUTO-COMPLETE INSTALL")
 
     installer = SystemInstaller(cli.context)
-    installer.install_radiuid_completion()
+    installer.install_bash_completion()
 
     input(cli.ui.color("\nYou will need to log out and log back in to enable the RadiUID Auto-Complete feature\nHit ENTER to Complete>>>>>", cli.ui.cyan))
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _request_reinstall_replace(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
@@ -170,9 +162,7 @@ def _request_reinstall_replace(cli: 'CLIRouter', arguments: str, args_list: List
 
     cli._log_command(arguments)
 
-    header = "########################## RADIUID REINSTALL/UPGRADE ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, "RADIUID REINSTALL/UPGRADE")
 
     installer = SystemInstaller(cli.context)
 
@@ -183,7 +173,7 @@ def _request_reinstall_replace(cli: 'CLIRouter', arguments: str, args_list: List
 
         if answer.lower() == "confirm":
             print("\n\n****************Re-installing/upgrading the RadiUID service...****************\n")
-            installer.copy_radiuid("replace-config")
+            installer.copy_radiuid_files(replace_config=True)
             installer.install_service()
 
             svcctloutput = cli.service_controller.control_service("restart", "radiuid")
@@ -198,14 +188,14 @@ def _request_reinstall_replace(cli: 'CLIRouter', arguments: str, args_list: List
                 print(cli.ui.color("\n\n********** LOOKS LIKE RADIUID IS NOT INSTALLED. YOU NEED TO INSTALL IT **********\n\n", cli.ui.red))
 
             print("\n")
-            installer.install_radiuid_completion()
+            installer.install_bash_completion()
             input(cli.ui.color(">>>>> You will need to log out and log back in to activate the RadiUID CLI auto-completion functionality\n>>>>> Hit ENTER to finish\n>>>>>", cli.ui.cyan))
             cli.print_success()
         else:
             print(cli.ui.color("\n\n***** Reinstall/Upgrade of RadiUID Cancelled *****\n", cli.ui.yellow))
     else:
         print("\n\n****************Re-installing/upgrading the RadiUID service...****************\n")
-        installer.copy_radiuid("replace-config")
+        installer.copy_radiuid_files(replace_config=True)
         installer.install_service()
 
         svcctloutput = cli.service_controller.control_service("restart", "radiuid")
@@ -220,10 +210,9 @@ def _request_reinstall_replace(cli: 'CLIRouter', arguments: str, args_list: List
             print(cli.ui.color("\n\n********** LOOKS LIKE RADIUID IS NOT INSTALLED. YOU NEED TO INSTALL IT **********\n\n", cli.ui.red))
 
         print("\n")
-        installer.install_radiuid_completion()
+        installer.install_bash_completion()
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _request_reinstall_keep(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
@@ -236,9 +225,7 @@ def _request_reinstall_keep(cli: 'CLIRouter', arguments: str, args_list: List[st
 
     cli._log_command(arguments)
 
-    header = "########################## RADIUID REINSTALL/UPGRADE ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, "RADIUID REINSTALL/UPGRADE")
 
     installer = SystemInstaller(cli.context)
 
@@ -249,7 +236,7 @@ def _request_reinstall_keep(cli: 'CLIRouter', arguments: str, args_list: List[st
 
         if answer.lower() == "confirm":
             print("\n\n****************Re-installing/upgrading the RadiUID service...****************\n")
-            installer.copy_radiuid("keep-config")
+            installer.copy_radiuid_files(replace_config=False)
             installer.install_service()
 
             print("\n\n****************Checking Config File Schema****************\n")
@@ -257,14 +244,14 @@ def _request_reinstall_keep(cli: 'CLIRouter', arguments: str, args_list: List[st
             cli.config_manager.save()
 
             print("\n")
-            installer.install_radiuid_completion()
+            installer.install_bash_completion()
             input(cli.ui.color(">>>>> You will need to log out and log back in to activate the RadiUID CLI auto-completion functionality\n>>>>> Hit ENTER to finish\n>>>>>", cli.ui.cyan))
             cli.print_success()
         else:
             print(cli.ui.color("\n\n***** Reinstall/Upgrade of RadiUID Cancelled *****\n", cli.ui.yellow))
     else:
         print("\n\n****************Re-installing/upgrading the RadiUID service...****************\n")
-        installer.copy_radiuid("keep-config")
+        installer.copy_radiuid_files(replace_config=False)
         installer.install_service()
 
         print("\n\n****************Checking Config File Schema****************\n")
@@ -272,10 +259,9 @@ def _request_reinstall_keep(cli: 'CLIRouter', arguments: str, args_list: List[st
         cli.config_manager.save()
 
         print("\n")
-        installer.install_radiuid_completion()
+        installer.install_bash_completion()
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _request_freeradius_install(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
@@ -288,9 +274,7 @@ def _request_freeradius_install(cli: 'CLIRouter', arguments: str, args_list: Lis
 
     cli._log_command(arguments)
 
-    header = "########################## FREERADIUS MANUAL INSTALL ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, "FREERADIUS MANUAL INSTALL")
 
     installer = SystemInstaller(cli.context)
 
@@ -305,8 +289,7 @@ def _request_freeradius_install(cli: 'CLIRouter', arguments: str, args_list: Lis
     else:
         installer.install_freeradius()
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _request_uninstall(cli: 'CLIRouter', arguments: str, args_list: List[str], remove_config: bool) -> None:
@@ -319,9 +302,7 @@ def _request_uninstall(cli: 'CLIRouter', arguments: str, args_list: List[str], r
 
     cli._log_command(arguments)
 
-    header = "########################## RADIUID UNINSTALL ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, "RADIUID UNINSTALL")
 
     installer = SystemInstaller(ui=cli.ui)
 
@@ -359,8 +340,7 @@ def _request_uninstall(cli: 'CLIRouter', arguments: str, args_list: List[str], r
         else:
             print(cli.ui.color("\n\n********** UNINSTALL COMPLETED WITH WARNINGS **********\n", cli.ui.yellow))
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)
 
 
 def _request_set_mount(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
@@ -369,9 +349,7 @@ def _request_set_mount(cli: 'CLIRouter', arguments: str, args_list: List[str]) -
 
     cli._log_command(arguments)
 
-    header = "########################## CONFIGURE MOUNT DEPENDENCY ##########################"
-    print(cli.ui.color(header, cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    header = print_header(cli, "CONFIGURE MOUNT DEPENDENCY")
 
     installer = SystemInstaller(ui=cli.ui)
 
@@ -380,8 +358,7 @@ def _request_set_mount(cli: 'CLIRouter', arguments: str, args_list: List[str]) -
         print(cli.ui.color("\n\nUsage: request set-mount <mount-path> | none", cli.ui.yellow))
         print(cli.ui.color("Example: request set-mount /mnt/accountinglogs", cli.ui.yellow))
         print(cli.ui.color("         request set-mount none\n", cli.ui.yellow))
-        print(cli.ui.color("#" * len(header), cli.ui.magenta))
-        print(cli.ui.color("#" * len(header), cli.ui.magenta))
+        print_footer(cli, header)
         return
 
     mount_path = args_list[2]
@@ -397,11 +374,10 @@ def _request_set_mount(cli: 'CLIRouter', arguments: str, args_list: List[str]) -
         if not mount_path.startswith('/'):
             print(cli.ui.color(f"\n\n***** Invalid mount path: {mount_path} *****", cli.ui.red))
             print(cli.ui.color("Mount path must be an absolute path starting with /\n", cli.ui.red))
-            print(cli.ui.color("#" * len(header), cli.ui.magenta))
-            print(cli.ui.color("#" * len(header), cli.ui.magenta))
+            print_footer(cli, header)
             return
 
-        # Convert to systemd mount unit name for display
+        # Convert to a systemd mount unit name for display.
         mount_unit = mount_path.strip('/').replace('/', '-') + '.mount'
 
         print(cli.ui.color(f"\n\n***** Configuring RadiUID service to wait for mount: {mount_path} *****\n", cli.ui.yellow))
@@ -412,5 +388,4 @@ def _request_set_mount(cli: 'CLIRouter', arguments: str, args_list: List[str]) -
         print(cli.ui.color("\n********** Mount dependency configured. Service file updated. **********\n", cli.ui.green))
         print(cli.ui.color("Run 'service radiuid restart' to apply changes.\n", cli.ui.cyan))
 
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
-    print(cli.ui.color("#" * len(header), cli.ui.magenta))
+    print_footer(cli, header)

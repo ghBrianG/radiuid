@@ -5,13 +5,12 @@ Entry point and command router for RadiUID CLI
 """
 
 import sys
-import ssl
 import os
 from typing import Optional, List
 
 from ..logging_config import get_logger
 from ..context import AppContext, get_context
-from ..constants import VERSION
+from ..constants import VERSION, TLSVersions
 from ..ui.interface import UserInterface
 from ..core.config_manager import ConfigManager
 from ..core.file_manager import FileManager
@@ -33,7 +32,7 @@ class CLIRouter:
         self.file_manager = FileManager(self.context, self.ui)
         self.firewall = PaloAltoFirewall(self.context, self.ui)
         self.data_processor = DataProcessor(self.context, self.ui)
-        self.service_controller = ServiceController(self.context)
+        self.service_controller = ServiceController(self.context.system_info)
 
         # Determine how radiuid was invoked
         if "radiuid.py" in sys.argv[0]:
@@ -56,15 +55,7 @@ class CLIRouter:
     def _setup_tls(self) -> None:
         """Configure TLS version from context"""
         tls_version = self.context.config.tls_version
-        try:
-            if tls_version == "1.0":
-                self.context.tls_obj = ssl.PROTOCOL_TLSv1
-            elif tls_version == "1.1":
-                self.context.tls_obj = ssl.PROTOCOL_TLSv1_1
-            elif tls_version == "1.2":
-                self.context.tls_obj = ssl.PROTOCOL_TLSv1_2
-        except (NameError, AttributeError):
-            self.context.tls_obj = ssl.PROTOCOL_TLSv1
+        self.context.tls_obj = TLSVersions.get_protocol(tls_version)
 
     def route(self, arguments: str) -> None:
         """Route arguments to appropriate command handler"""

@@ -19,17 +19,17 @@ logger = get_logger('system_setup')
 
 def generate_systemd_service(mount_point: str = None) -> str:
     """
-    Generate systemd service file content.
+    Generate the systemd service file content.
 
     Args:
-        mount_point: Optional mount point path (e.g., /mnt/accountinglogs)
-                    If provided, adds mount dependencies to service file
+        mount_point: An optional mount point path (e.g., /mnt/accountinglogs).
+                    If provided, adds the mount dependencies to the service file.
 
     Returns:
-        Service file content as string
+        The service file content as a string
     """
     if mount_point:
-        # Convert mount point to systemd mount unit name
+        # Convert the mount point to a systemd mount unit name.
         # /mnt/accountinglogs -> mnt-accountinglogs.mount
         mount_unit = mount_point.strip('/').replace('/', '-') + '.mount'
 
@@ -50,36 +50,36 @@ def generate_systemd_service(mount_point: str = None) -> str:
 
 class ServiceController:
     """
-    Controls system services (start, stop, restart, status).
+    Controls the system services (start, stop, restart, status).
     Supports SystemD, init.d, and container environments.
     """
 
     def __init__(self, system_info: Optional[SystemInfo] = None, ui: Optional[UserInterface] = None):
         """
-        Initialize ServiceController.
+        Initialize the ServiceController.
 
         Args:
-            system_info: System information instance
-            ui: User interface for output
+            system_info: A system information instance
+            ui: A user interface for output
         """
         self.system_info = system_info or get_system_info()
         self.ui = ui or UserInterface()
 
     @staticmethod
     def get_current_user() -> str:
-        """Get the currently logged in user."""
+        """Get the currently logged-in user."""
         result = subprocess.getstatusoutput("whoami")
         return result[1]
 
     def get_processes(self, service_name: str) -> Dict[str, Any]:
         """
-        Get process information for a service.
+        Get the process information for a service.
 
         Args:
-            service_name: Name of the service/process
+            service_name: The name of the service/process
 
         Returns:
-            Dictionary with process information
+            A dictionary with process information
         """
         proc_output = subprocess.getstatusoutput("ps -e")[1].splitlines()
         proc_list = []
@@ -102,7 +102,7 @@ class ServiceController:
             if len(proc) >= 4 and proc[3] == service_name:
                 match_list.append(proc[0])
 
-        # Build modified process data (excluding current process)
+        # Build modified process data (excluding the current process)
         mod_proc_data = ""
         for i, line in enumerate(proc_output):
             if my_line is not None and i == my_line:
@@ -121,11 +121,11 @@ class ServiceController:
         Control a system service.
 
         Args:
-            action: Action to perform (start, stop, restart, status)
-            service: Service name
+            action: The action to perform (start, stop, restart, status)
+            service: The service name
 
         Returns:
-            Dictionary with command results and status
+            A dictionary with the command results and the status
         """
         result = {
             'beforecmd': '',
@@ -137,7 +137,7 @@ class ServiceController:
             'status': 'unknown'
         }
 
-        # Determine mode and commands based on system type
+        # Determine mode and commands based on the system type
         if self.system_info.has_systemd:
             result = self._control_systemd(action, service)
         elif self.system_info.in_container:
@@ -148,7 +148,7 @@ class ServiceController:
         return result
 
     def _control_systemd(self, action: str, service: str) -> Dict[str, Any]:
-        """Control service using systemd."""
+        """Control a service using systemd."""
         before_cmd = f"systemctl status {service}"
         action_cmd = f"systemctl {action} {service}"
         after_cmd = f"systemctl status {service}"
@@ -162,7 +162,7 @@ class ServiceController:
         action_result = subprocess.getstatusoutput(action_cmd)
         after = subprocess.getstatusoutput(after_cmd)
 
-        # Determine status
+        # Determine the status
         status = self._determine_status(after[1], active_words, dead_words, not_found_words)
 
         return {
@@ -176,7 +176,7 @@ class ServiceController:
         }
 
     def _control_container(self, action: str, service: str) -> Dict[str, Any]:
-        """Control service in a container environment."""
+        """Control a service in a container environment."""
         before_cmd = "ps -e"
         after_cmd = "ps -e"
         action_cmd = ""
@@ -187,14 +187,14 @@ class ServiceController:
         if action == "stop":
             if not match_list:
                 print(self.ui.color(f"****************{service} is not running!****************\n", self.ui.red))
-                action_cmd = "cd"  # No-op
+                action_cmd = "cd"  # A no-op
             else:
                 action_cmd = "; ".join([f"kill {pid}" for pid in match_list])
 
         elif action == "start":
             if match_list:
                 print(self.ui.color(f"****************{service} is already running! Stop it first!****************\n", self.ui.red))
-                action_cmd = "cd"  # No-op
+                action_cmd = "cd"  # A no-op
             else:
                 if service == "radiuid":
                     action_cmd = "radiuid run >> /dev/null &"
@@ -210,7 +210,7 @@ class ServiceController:
                 action_cmd += f"; {radius_service}"
 
         elif action == "status":
-            action_cmd = "cd"  # No-op
+            action_cmd = "cd"  # A no-op
 
         # Run commands
         before = subprocess.getstatusoutput(before_cmd)
@@ -218,7 +218,7 @@ class ServiceController:
         action_result = (0, self.get_processes(service)['modprocdata'])
         after = (0, self.get_processes(service)['modprocdata'])
 
-        # Determine status
+        # Determine the status
         status = "dead"
         if service in after[1]:
             status = "running"
@@ -234,7 +234,7 @@ class ServiceController:
         }
 
     def _control_initd(self, action: str, service: str) -> Dict[str, Any]:
-        """Control service using init.d."""
+        """Control a service using init.d."""
         before_cmd = f"service {service} status"
         action_cmd = f"service {service} {action}"
         after_cmd = f"service {service} status"
@@ -248,7 +248,7 @@ class ServiceController:
         action_result = subprocess.getstatusoutput(action_cmd)
         after = subprocess.getstatusoutput(after_cmd)
 
-        # Determine status
+        # Determine the status
         status = self._determine_status(after[1], active_words, dead_words, not_found_words)
 
         return {
@@ -263,7 +263,7 @@ class ServiceController:
 
     @staticmethod
     def _determine_status(output: str, active_words: List[str], dead_words: List[str], not_found_words: List[str]) -> str:
-        """Determine service status from command output."""
+        """Determine the service status from the command output."""
         status = "unknown"
 
         for word in dead_words:
@@ -283,7 +283,7 @@ class ServiceController:
 
 class SystemInstaller:
     """
-    Handles RadiUID installation and setup tasks.
+    Handles the RadiUID installation and setup tasks.
     """
 
     # Installation paths
@@ -313,17 +313,17 @@ class SystemInstaller:
 
     def copy_radiuid_files(self, replace_config: bool = True) -> None:
         """
-        Copy RadiUID files to system paths.
+        Copy the RadiUID files to the system paths.
 
         Args:
-            replace_config: Whether to replace existing config file
+            replace_config: Whether to replace the existing config file
         """
-        # Create config directory
+        # Create the config directory
         os.makedirs(self.CONFIG_PATH, exist_ok=True)
 
-        # Copy config file if requested
+        # Copy the config file if requested
         if replace_config:
-            # Look for config file in various locations
+            # Look for the config file in various locations
             config_sources = [
                 'radiuid.yaml',
                 'examples/radiuid.yaml.sample',
@@ -334,7 +334,7 @@ class SystemInstaller:
                     os.system(f'cp {source} {self.CONFIG_PATH}radiuid.yaml')
                     break
 
-        # Copy main script
+        # Copy the main script
         if os.path.exists('radiuid.py'):
             os.system(f'cp radiuid.py {self.BIN_PATH}radiuid')
             os.system(f'chmod 777 {self.BIN_PATH}radiuid')
@@ -346,8 +346,8 @@ class SystemInstaller:
         Install RadiUID as a system service.
 
         Args:
-            mount_point: Optional network mount point path (e.g., /mnt/accountinglogs)
-                        If provided, service will wait for mount before starting
+            mount_point: An optional network mount point path (e.g., /mnt/accountinglogs).
+                        If provided, the service will wait for the mount before starting.
         """
         if self.system_info.has_systemd:
             install_path = self.SYSTEMD_PATH
@@ -358,11 +358,11 @@ class SystemInstaller:
 
         self.ui.progress("Installing: ", 2)
 
-        # Write service file
+        # Write the service file
         with open(install_path, 'w') as f:
             f.write(install_content)
 
-        # Reload systemd to pick up changes
+        # Reload systemd to pick up the changes
         if self.system_info.has_systemd:
             os.system('systemctl daemon-reload')
             os.system('systemctl enable radiuid')
@@ -371,7 +371,7 @@ class SystemInstaller:
             os.system('chkconfig radiuid on')
 
     def install_bash_completion(self) -> None:
-        """Install bash completion script for RadiUID CLI."""
+        """Install the bash completion script for the RadiUID CLI."""
         completion_script = self._get_bash_completion_script()
 
         try:
@@ -388,7 +388,7 @@ class SystemInstaller:
         Uninstall RadiUID from the system.
 
         Args:
-            remove_config: Whether to remove configuration files
+            remove_config: Whether to remove the configuration files
 
         Returns:
             True on success, False on failure
@@ -408,7 +408,7 @@ class SystemInstaller:
             os.system('chkconfig radiuid off 2>/dev/null')
         self.ui.progress("Disabling Service: ", 1)
 
-        # Remove service file
+        # Remove the service file
         print("Removing service file...")
         if os.path.exists(self.SYSTEMD_PATH):
             try:
@@ -429,7 +429,7 @@ class SystemInstaller:
             os.system('systemctl daemon-reload')
         self.ui.progress("Removing Service Files: ", 1)
 
-        # Remove main executable
+        # Remove the main executable
         print("Removing RadiUID executable...")
         bin_path = os.path.join(self.BIN_PATH, "radiuid")
         if os.path.exists(bin_path):
@@ -440,7 +440,7 @@ class SystemInstaller:
                 success = False
         self.ui.progress("Removing Executable: ", 1)
 
-        # Remove bash completion
+        # Remove the bash completion
         print("Removing bash completion...")
         if os.path.exists(self.BASH_COMPLETION_PATH):
             try:
@@ -452,7 +452,7 @@ class SystemInstaller:
 
         # Optionally remove config directory
         if remove_config:
-            print("Removing configuration files...")
+            print("Removing the configuration files...")
             if os.path.exists(self.CONFIG_PATH):
                 import shutil
                 try:
@@ -462,13 +462,13 @@ class SystemInstaller:
                     success = False
             self.ui.progress("Removing Configuration: ", 1)
         else:
-            print(self.ui.color(f"Configuration preserved at {self.CONFIG_PATH}", self.ui.cyan))
+            print(self.ui.color(f"The configuration is preserved at {self.CONFIG_PATH}", self.ui.cyan))
 
         return success
 
     def install_freeradius(self) -> str:
         """
-        Install FreeRADIUS server.
+        Install the FreeRADIUS server.
 
         Returns:
             'PASS' on success, 'FAIL' on failure
@@ -478,7 +478,7 @@ class SystemInstaller:
         print(f"Installing FreeRADIUS using {pkg_manager}...")
         os.system(f'{pkg_manager} install freeradius -y')
 
-        # Refresh service name detection
+        # Refresh the service name detection
         self.system_info.refresh()
         radius_service = self.system_info.radius_service_name
 
@@ -486,7 +486,7 @@ class SystemInstaller:
         self.service_controller.control_service("start", radius_service)
         time.sleep(3)
 
-        # Check if running
+        # Check if it is running
         status = self.service_controller.control_service("status", radius_service)
         if status['status'] == "running":
             print(self.ui.color("****************FreeRADIUS is Now Running!****************", self.ui.green))
@@ -496,6 +496,17 @@ class SystemInstaller:
             print(self.ui.color("****************You may need to run some system updates for it to install correctly****************", self.ui.red))
             return "FAIL"
 
+    def update_xml_etree(self) -> None:
+        """
+        Update XML ETree module (legacy compatibility method).
+
+        This was used to update the XML ETree module on older Python versions.
+        With Python 3.8+, this is no longer needed as the standard library
+        includes an up-to-date ElementTree implementation.
+        """
+        print(self.ui.color("\n***** XML ETree update is no longer needed with Python 3.8+ *****", self.ui.green))
+        print(self.ui.color("***** The standard library includes an up-to-date ElementTree implementation *****\n", self.ui.green))
+
     def _get_bash_completion_script(self) -> str:
-        """Get the bash completion script content from template file."""
+        """Get the bash completion script content from the template file."""
         return read_template('bash_completion.sh')

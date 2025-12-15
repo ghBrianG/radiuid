@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 logger = get_logger('data_processor')
 
 # RADIUS packet type codes mapped to accounting status (RFC 2866, RFC 3575)
-# Values 1-3, 11 are authentication events (Access-Request/Accept/Reject) - no IP assigned yet
-# Values 4-5 are accounting events with IP info that we process
+# Values 1-3, 11 are authentication events (Access-Request/Accept/Reject) - no IP is assigned yet.
+# Values 4-5 are accounting events with IP info that we process.
 NPS_PACKET_TYPES = {
     '1': 'access_request',   # Skip - no IP yet
     '2': 'access_accept',    # Skip - no IP yet
@@ -807,6 +807,7 @@ class DataProcessor:
 
                         elif 'set-variable' in currentstep.keys():
                             variablename = currentstep['set-variable']
+                            variablevalue = ''  # Default value
 
                             if 'from-string' in currentstep.keys():
                                 variablevalue = currentstep['from-string']
@@ -834,6 +835,7 @@ class DataProcessor:
 
                             assembleresult = ''
                             for variableid in variableindex:
+                                variablename = ''  # Default value
                                 try:
                                     variablename = currentstep['assemble'][variableid]
                                     variablevalue = variables[variablename]
