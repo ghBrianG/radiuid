@@ -305,10 +305,21 @@ class CLIRouter:
 def main() -> None:
     """Main entry point for RadiUID CLI"""
     cli = CLIRouter()
-    cli.initialize()
 
     # Build arguments string from sys.argv
     arguments = cli.cat_list(sys.argv[1:])
+
+    # Commands that don't require configuration
+    no_config_commands = ['install', 'help', 'version', '']
+
+    # Only initialize config for commands that need it
+    if not any(arguments.startswith(cmd) for cmd in no_config_commands):
+        try:
+            cli.initialize()
+        except FileNotFoundError:
+            print(cli.ui.color("Configuration file not found.", cli.ui.red))
+            print(cli.ui.color("Run 'radiuid install' to set up RadiUID.", cli.ui.yellow))
+            return
 
     # Route to appropriate handler
     cli.route(arguments)
