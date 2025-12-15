@@ -310,10 +310,11 @@ def main() -> None:
     arguments = cli.cat_list(sys.argv[1:])
 
     # Commands that don't require configuration
-    no_config_commands = ['install', 'help', 'version', '']
+    no_config_commands = ['install', 'help', 'version']
 
     # Only initialize config for commands that need it
-    if not any(arguments.startswith(cmd) for cmd in no_config_commands):
+    needs_config = arguments and not any(arguments.startswith(cmd) for cmd in no_config_commands)
+    if needs_config:
         try:
             cli.initialize()
         except FileNotFoundError:

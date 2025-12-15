@@ -474,6 +474,13 @@ class ConfigManager:
         """
         # Show full configuration
         if element_name == 'config':
+            if not self._config_data:
+                # Config not loaded - try loading it
+                try:
+                    self.load(mode='quiet')
+                except FileNotFoundError:
+                    print("Configuration file not found")
+                    return
             print(yaml.dump(self._config_data, default_flow_style=False, sort_keys=False))
             return
 
