@@ -470,8 +470,13 @@ class ConfigManager:
         Args:
             _output_format: Reserved for future format options
             _mode: Reserved for future display modes
-            element_name: Name of the element to display
+            element_name: Name of the element to display ('config' for full config)
         """
+        # Show full configuration
+        if element_name == 'config':
+            print(yaml.dump(self._config_data, default_flow_style=False, sort_keys=False))
+            return
+
         if element_name == 'targets':
             targets = self._config_data.get('targets', {})
             print(yaml.dump({'targets': targets}, default_flow_style=False))
