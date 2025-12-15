@@ -5,7 +5,6 @@ Handles all 'request' CLI commands for RadiUID
 """
 
 from typing import TYPE_CHECKING, List
-import re
 
 from ...constants import VERSION
 
@@ -93,7 +92,7 @@ def _show_help() -> None:
     print(" - request set-mount (<mount-path> | none)                       |     Configure network mount dependency for RadiUID service\n")
 
 
-def _request_munge_test(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
+def _request_munge_test(cli: 'CLIRouter', _arguments: str, args_list: List[str]) -> None:
     """Test munge engine with a string"""
     # Check for debug flag
     if len(args_list) > 3 and args_list[3] == 'debug':
@@ -127,7 +126,7 @@ def _request_munge_test(cli: 'CLIRouter', arguments: str, args_list: List[str]) 
     print(cli.ui.color("#" * len(header), cli.ui.magenta))
 
 
-def _request_xml_update(cli: 'CLIRouter', arguments: str) -> None:
+def _request_xml_update(cli: 'CLIRouter', _arguments: str) -> None:
     """Update XML ETree modules"""
     from ...installer.system_setup import SystemInstaller
 
@@ -144,7 +143,7 @@ def _request_xml_update(cli: 'CLIRouter', arguments: str) -> None:
     print(cli.ui.color("#" * len(header), cli.ui.magenta))
 
 
-def _request_auto_complete(cli: 'CLIRouter', arguments: str) -> None:
+def _request_auto_complete(cli: 'CLIRouter', _arguments: str) -> None:
     """Install bash auto-completion"""
     from ...installer.system_setup import SystemInstaller
 

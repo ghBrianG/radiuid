@@ -1,0 +1,151 @@
+# ==============================================================================
+# RadiUID Configuration File
+# ==============================================================================
+# Written by John W Kerns (http://blog.packetsar.com)
+# Python 3 port by Brian Griffith
+# https://github.com/ghBrianG/radiuid
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# PATHS
+# ------------------------------------------------------------------------------
+# radius_log_path: Path to FreeRADIUS Accounting Log Directory
+#                  Default: /var/log/radius/radacct/
+# log_file:        Full file path for RadiUID activity logs
+# acct_log_copy_path: Path to copy RADIUS accounting logs before deletion
+#                     Set to null to disable copying
+paths:
+  radius_log_path: /var/log/radius/radacct/
+  log_file: /etc/radiuid/radiuid.log
+  acct_log_copy_path: null
+
+# ------------------------------------------------------------------------------
+# LOGGING
+# ------------------------------------------------------------------------------
+# max_log_lines: Maximum number of lines to keep in log file (0 = unlimited)
+logging:
+  max_log_lines: 0
+
+# ------------------------------------------------------------------------------
+# USER-ID SETTINGS
+# ------------------------------------------------------------------------------
+# user_domain: Domain prepended to username when pushed to Palo Alto
+#              Leave empty ("") to push no domain info
+# timeout:     Timeout for User-ID entries in minutes
+#              Adjust based on how often RADIUS clients re-authenticate
+uid_settings:
+  user_domain: domain.com
+  timeout: 60
+
+# ------------------------------------------------------------------------------
+# SEARCH TERMS
+# ------------------------------------------------------------------------------
+# Used for finding information in FreeRADIUS logs
+# You almost certainly do not need to change these
+#
+# ip_address_term:  Search term for IP info in logs
+# username_term:    Search term for username info in logs
+# delineator_term:  Search term for separating log entries
+#                   "[PARAGRAPH]" = separate by empty lines
+search_terms:
+  ip_address_term: Framed-IP-Address
+  username_term: User-Name
+  delineator_term: "[PARAGRAPH]"
+
+# ------------------------------------------------------------------------------
+# MISC SETTINGS
+# ------------------------------------------------------------------------------
+# loop_time:          Seconds between checks of RADIUS logs
+# tls_version:        TLS version for XML API (1.0, 1.1, or 1.2)
+# radius_stop_action: Action when RADIUS stop message is found:
+#                     push   = Push the mapping anyway
+#                     ignore = Remove from push list, don't clear from PAN
+#                     clear  = Remove from push list AND clear from PAN
+# max_uids_per_call:  Maximum UIDs per API call (default: 50)
+misc:
+  loop_time: 10
+  tls_version: "1.2"
+  radius_stop_action: clear
+  max_uids_per_call: 50
+
+# ------------------------------------------------------------------------------
+# LIVE LOG SETTINGS (Optional)
+# ------------------------------------------------------------------------------
+# For processing NPS (Windows Network Policy Server) logs in real-time
+#
+# enabled: Enable/disable live log processing (true/false)
+# file:    Path to the NPS log file to monitor
+# tracker: Path to store the position tracker file
+livelog:
+  enabled: false
+  file: null
+  tracker: /var/lib/radiuid/livelog_tracker
+
+# ------------------------------------------------------------------------------
+# NPS CSV PARSING SETTINGS (Optional)
+# ------------------------------------------------------------------------------
+# Configure column positions for NPS/IAS CSV log files
+# Column numbers are 0-indexed (first column = 0)
+#
+# ip_column:          Column containing the IP address (default: 0)
+# username_column:    Column containing the username (default: 1)
+# packet_type_column: Column containing the packet type code (default: 6)
+#
+# Set to null or -1 to auto-detect based on RADIUS attribute numbers
+# Auto-detect looks for: 4108 (MS-RAS-Client-IP), 8 (Framed-IP-Address),
+#                        4129 (MS-User-Name), 1 (User-Name)
+nps_csv:
+  ip_column: 0
+  username_column: 1
+  packet_type_column: 6
+
+# ------------------------------------------------------------------------------
+# MUNGE RULES (Optional)
+# ------------------------------------------------------------------------------
+# Rule-based string processor for filtering/transforming User-IDs
+# Configure via CLI: radiuid set munge <rule>.<step> [parameters]
+#
+# Example:
+# munge:
+#   "101.0":
+#     action: match
+#     pattern: "\\\\"
+#     matchtype: partial
+#   "101.10":
+#     action: set-variable
+#     variable: domain
+#     pattern: "^(.+?)\\\\"
+#   "101.20":
+#     action: set-variable
+#     variable: username
+#     pattern: "\\\\(.+)$"
+#   "101.30":
+#     action: assemble
+#     template: "{domain}\\{username}"
+munge: {}
+
+# ------------------------------------------------------------------------------
+# TARGETS
+# ------------------------------------------------------------------------------
+# Palo Alto firewalls where RadiUID will push IP-to-User mappings
+#
+# hostname: FQDN or IP of the Palo Alto firewall
+# vsys:     Virtual System ID (usually 1)
+# username: Admin username for API access
+# password: Admin password (characters &, <, > are not allowed)
+# port:     API port (default: 443)
+#
+# Example:
+# targets:
+#   "192.168.1.1:1":
+#     hostname: 192.168.1.1
+#     vsys: 1
+#     username: admin
+#     password: secretpassword
+#   "pan1.domain.com:1":
+#     hostname: pan1.domain.com
+#     vsys: 1
+#     username: admin
+#     password: secretpassword
+#     port: 443
+targets: {}

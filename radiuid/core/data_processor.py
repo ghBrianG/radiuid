@@ -9,8 +9,8 @@ import re
 import xml.etree.ElementTree as ElementTree
 from typing import List, Dict, Any, Optional, TYPE_CHECKING
 
-from ..logging_config import get_logger
 from ..context import AppContext, get_context
+from ..logging_config import get_logger
 
 if TYPE_CHECKING:
     from ..ui.interface import UserInterface
@@ -18,13 +18,15 @@ if TYPE_CHECKING:
 
 logger = get_logger('data_processor')
 
-# NPS Packet-Type mapping
+# RADIUS packet type codes mapped to accounting status (RFC 2866, RFC 3575)
+# Values 1-3, 11 are authentication events (Access-Request/Accept/Reject) - no IP assigned yet
+# Values 4-5 are accounting events with IP info that we process
 NPS_PACKET_TYPES = {
     '1': 'access_request',   # Skip - no IP yet
     '2': 'access_accept',    # Skip - no IP yet
     '3': 'access_reject',    # Skip
-    '4': 'start',            # Accounting-Start
-    '5': 'stop',             # Accounting-Stop
+    '4': 'start',  # Accounting-Start (session began)
+    '5': 'stop',  # Accounting-Stop (session ended)
     '11': 'access_accept',   # Skip - no IP yet
 }
 
@@ -238,7 +240,8 @@ class DataProcessor:
         try:
             with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
                 # Read line by line to handle files with very long XML lines
-                # Check up to first 100 lines for CSV content
+                # Limit scan to first 100 lines to avoid memory issues on large files
+                # (NPS XML files can have extremely long lines that would slow detection)
                 lines_checked = 0
                 max_lines = 100
 
@@ -359,9 +362,10 @@ class DataProcessor:
         packet_type = packet_type_elem.text.strip()
         status = NPS_PACKET_TYPES.get(packet_type)
 
-        # Skip non-accounting events (access-request, access-accept, etc.)
+        # Auth events (types 1-3, 11) don't have Acct-Status-Type field
+        # If we have IP+username info from auth response, treat as session start
+        # (Some NPS configs include Framed-IP in Access-Accept responses)
         if status not in ('start', 'stop'):
-            # For auth events, treat as 'start' if we have IP info
             status = 'start'
 
         # Get IP address - try Client-IP-Address first, then Framed-IP-Address
@@ -408,17 +412,15 @@ class DataProcessor:
         Parse NPS/IAS CSV log files
 
         Files may contain XML <Event> lines at the start - these are skipped.
-        Only CSV lines starting with an IP address are processed.
+        Column positions are configurable via nps_csv settings.
 
-        CSV format fields (comma-separated):
+        Default CSV format fields (comma-separated):
         0: IP address (e.g., 10.1.75.8)
         1: Username (e.g., Larryg or jindal_domain\\metlab)
-        2: Date
-        3: Time
-        4: Event source (IAS)
-        5: Computer name (JSW-NPS)
         6: Packet type (4=start, 5=stop, 11=access-accept, etc.)
-        ... additional fields
+
+        When columns are set to -1, auto-detection is used based on RADIUS
+        attribute numbers in the CSV (e.g., "8,10.1.2.3" for Framed-IP-Address).
 
         Args:
             filelist: List of NPS CSV log file paths
@@ -427,6 +429,18 @@ class DataProcessor:
             Dictionary with IP as key and {username, status} as value
         """
         result = {}
+
+        # Get column settings from config (default to standard positions)
+        ip_col = 0
+        username_col = 1
+        packet_type_col = 6
+
+        if self.context and self.context.config:
+            ip_col = self.context.config.nps_ip_column
+            username_col = self.context.config.nps_username_column
+            packet_type_col = self.context.config.nps_packet_type_column
+
+        use_auto_detect = ip_col < 0 or username_col < 0
 
         for filepath in filelist:
             if self.filemgmt:
@@ -450,21 +464,35 @@ class DataProcessor:
                             continue
 
                         fields = line.split(',')
-                        if len(fields) < 7:
-                            logger.debug(f"Skipping line {line_num}: not enough fields ({len(fields)})")
+
+                        if use_auto_detect:
+                            # Auto-detect mode: look for RADIUS attribute numbers
+                            mapping = self._parse_nps_csv_auto(fields, line_num)
+                            if mapping:
+                                ip, data = mapping
+                                result[ip] = data
+                                csv_lines_parsed += 1
                             continue
 
-                        ip = fields[0].strip()
-                        username_raw = fields[1].strip()
-                        packet_type = fields[6].strip()
+                        # Fixed column mode
+                        min_fields = max(ip_col, username_col, packet_type_col) + 1
+                        if len(fields) < min_fields:
+                            logger.debug(
+                                f"Skipping line {line_num}: not enough fields ({len(fields)}, need {min_fields})")
+                            continue
 
-                        # Validate IP address (skip non-CSV lines)
-                        if not self._is_valid_ip(ip):
+                        ip = fields[ip_col].strip() if ip_col >= 0 else None
+                        username_raw = fields[username_col].strip() if username_col >= 0 else None
+                        packet_type = fields[packet_type_col].strip() if packet_type_col >= 0 and packet_type_col < len(
+                            fields) else '4'
+
+                        # Validate IP address
+                        if not ip or not self._is_valid_ip(ip):
                             logger.debug(f"Skipping line {line_num}: invalid IP '{ip}'")
                             continue
 
                         # Extract username (handle DOMAIN\user format)
-                        if '\\' in username_raw:
+                        if username_raw and '\\' in username_raw:
                             username = username_raw.split('\\')[-1]
                         else:
                             username = username_raw
@@ -493,6 +521,90 @@ class DataProcessor:
             logger.info(f"Parsed {len(result)} IP-to-user mappings from NPS CSV logs")
 
         return result
+
+    def _parse_nps_csv_auto(self, fields: List[str], line_num: int) -> Optional[tuple]:
+        """
+        Parse NPS CSV line using auto-detection based on RADIUS attribute numbers.
+
+        Looks for attribute patterns like "8,10.1.2.3" (Framed-IP-Address) or
+        "1,username" (User-Name) in the CSV fields.
+
+        RADIUS Attribute Numbers:
+        - 1: User-Name
+        - 4: NAS-IP-Address (access point IP - skip this)
+        - 8: Framed-IP-Address (user's assigned IP)
+        - 40: Acct-Status-Type (1=start, 2=stop)
+        - 4108: MS-RAS-Client-IP-Address
+        - 4129: MS-User-Name
+
+        Args:
+            fields: CSV fields from a single line
+            line_num: Line number for debug logging
+
+        Returns:
+            Tuple of (ip, {username, status}) or None if not parseable
+        """
+        ip = None
+        username = None
+        status = 'start'
+
+        # Join fields and look for attribute patterns
+        line_content = ','.join(fields)
+
+        # RADIUS attribute numbers for IP address (RFC 2865)
+        # 8: Framed-IP-Address - the user's assigned IP (preferred)
+        # 4108: MS-RAS-Client-IP - Microsoft vendor-specific attribute (fallback)
+        # Note: We skip attribute 4 (NAS-IP-Address) - that's the access point's IP, not the user's
+        ip_patterns = [
+            (r'\b8,(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b', 'Framed-IP-Address'),
+            (r'\b4108,(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b', 'MS-RAS-Client-IP'),
+        ]
+
+        for pattern, attr_name in ip_patterns:
+            match = re.search(pattern, line_content)
+            if match:
+                candidate_ip = match.group(1)
+                if self._is_valid_ip(candidate_ip):
+                    ip = candidate_ip
+                    logger.debug(f"Line {line_num}: Found IP via {attr_name}: {ip}")
+                    break
+
+        # RADIUS attribute numbers for username (RFC 2865)
+        # 1: User-Name - standard RADIUS username (preferred)
+        # 4129: MS-User-Name - Microsoft vendor-specific attribute (fallback)
+        username_patterns = [
+            (r'\b1,([^,]+)', 'User-Name'),
+            (r'\b4129,([^,]+)', 'MS-User-Name'),
+        ]
+
+        for pattern, attr_name in username_patterns:
+            match = re.search(pattern, line_content)
+            if match:
+                username_raw = match.group(1).strip()
+                if username_raw and not username_raw.isdigit():
+                    # Handle DOMAIN\user format
+                    if '\\' in username_raw:
+                        username = username_raw.split('\\')[-1]
+                    else:
+                        username = username_raw
+                    logger.debug(f"Line {line_num}: Found username via {attr_name}: {username}")
+                    break
+
+        # RADIUS Acct-Status-Type attribute (40) values per RFC 2866:
+        # 1 = Start (session began), 2 = Stop (session ended)
+        # Other values (3=Interim-Update, 7=Accounting-On, etc.) default to 'start'
+        status_match = re.search(r'\b40,(\d+)\b', line_content)
+        if status_match:
+            status_code = status_match.group(1)
+            if status_code == '1':
+                status = 'start'
+            elif status_code == '2':
+                status = 'stop'
+
+        if ip and username:
+            return (ip, {"username": username, "status": status})
+
+        return None
 
     def _is_valid_ip(self, ip: str) -> bool:
         """

@@ -5,7 +5,6 @@ Handles 'push' CLI commands for RadiUID
 """
 
 from typing import TYPE_CHECKING, List
-import re
 
 if TYPE_CHECKING:
     from ..main import CLIRouter

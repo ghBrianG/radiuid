@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from ..main import CLIRouter
 
 
-def handle(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
+def handle(cli: 'CLIRouter', arguments: str, _args_list: List[str]) -> None:
     """Handle service commands"""
 
     # Service help

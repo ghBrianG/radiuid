@@ -17,7 +17,7 @@ This is a fork of the [original RadiUID project](https://github.com/PackeTsar/ra
 ## TABLE OF CONTENTS
 1. [What is RadiUID?](#what-is-radiuid)
 2. [How it Works](#how-it-works)
-3. [Screenshots](#screenshots)
+3. [Examples](#examples)
 4. [Requirements](#requirements)
 5. [Tested Environments](#tested-environments)
 6. [Docker Install Instructions](#docker-install-instructions)
@@ -51,24 +51,151 @@ RadiUID runs as a system service on Linux and is very easy to configure and use.
 
 
 --------------------------------------
-## SCREENSHOTS
-**The main list of CLI command options**
-![RadiUID][all-args]
+
+## EXAMPLES
+
+**The main list of CLI command options (`radiuid`)**
+
+```
+$ radiuid
+-------------------------------------------------------------------------------------------------------------------------------
+                     ARGUMENTS                    |                                  DESCRIPTIONS
+-------------------------------------------------------------------------------------------------------------------------------
+
+ - run                                            |  Run the RadiUID main program in shell mode
+-------------------------------------------------------------------------------------------------------------------------------
+
+ - install                                        |  Run RadiUID Install/Maintenance Utility
+-------------------------------------------------------------------------------------------------------------------------------
+
+ - show log                                       |  Show the RadiUID log file
+ - show acct-logs                                 |  Show the log files in the FreeRADIUS accounting directory
+ - show livelog                                   |  Show the live log file settings
+ - show config (yaml | set)                       |  Show the RadiUID configuration
+ - show clients (file | table)                    |  Show the FreeRADIUS clients
+ - show status                                    |  Show the RadiUID and FreeRADIUS service statuses
+ - show mappings (<target> | all | consistency)   |  Show the current IP-to-User mappings
+-------------------------------------------------------------------------------------------------------------------------------
+
+ - set <option> <value>                           |  Set configuration options
+ - push (<target> | all) <user> <ip>              |  Manually push a User-ID mapping
+ - clear <option>                                 |  Clear logs, mappings, or configuration
+ - service <service> <action>                     |  Control RadiUID and FreeRADIUS services
+ - request <action>                               |  Request system operations
+-------------------------------------------------------------------------------------------------------------------------------
+
+ - version                                        |  Show the current version of RadiUID
+-------------------------------------------------------------------------------------------------------------------------------
+```
 
 **Output from the `show log` command**
-![RadiUID][show-log]
 
-**Output from the `show config` command**
-![RadiUID][show-config]
+```
+$ radiuid show log
+================================================================================
+                              RADIUID LOG FILE
+================================================================================
+2025-01-15 10:23:45 INFO     [service] RadiUID service starting...
+2025-01-15 10:23:45 INFO     [config_manager] Loaded configuration from /etc/radiuid/radiuid.yaml
+2025-01-15 10:23:46 INFO     [service] Found 3 accounting log files to process
+2025-01-15 10:23:46 INFO     [data_processor] Processing: detail-20250115
+2025-01-15 10:23:46 INFO     [data_processor] Extracted 12 User-ID mappings
+2025-01-15 10:23:47 INFO     [palo_alto] Pushing 12 UIDs to firewall01.example.com:vsys1
+2025-01-15 10:23:47 INFO     [palo_alto] Successfully pushed UIDs to firewall01.example.com:vsys1
+2025-01-15 10:23:47 INFO     [service] Sleeping for 10 seconds...
+```
+
+**Output from the `show config` command (YAML format)**
+
+```
+$ radiuid show config
+paths:
+  radius_log_path: /var/log/freeradius/radacct/
+  log_file: /etc/radiuid/radiuid.log
+  acct_log_copy_path: null
+
+logging:
+  max_log_lines: 10000
+
+uid_settings:
+  user_domain: MYDOMAIN
+  timeout: 60
+
+misc:
+  loop_time: 10
+  tls_version: '1.2'
+  radius_stop_action: clear
+
+targets:
+  firewall01.example.com:vsys1:
+    hostname: firewall01.example.com
+    vsys: '1'
+    username: radiuid-api
+    password: '********'
+    port: '443'
+```
 
 **Output from the `show config set` command**
-![RadiUID][show-config-set]
 
-**Pushing a mapping using the `push` command and checking the current mappings using the `show mappings` command**
-![RadiUID][push-and-show]
+```
+$ radiuid show config set
+radiuid set logfile /etc/radiuid/radiuid.log
+radiuid set radiuslogpath /var/log/freeradius/radacct/
+radiuid set maxloglines 10000
+radiuid set userdomain MYDOMAIN
+radiuid set timeout 60
+radiuid set looptime 10
+radiuid set tlsversion 1.2
+radiuid set radiusstopaction clear
+radiuid set target firewall01.example.com:1 username radiuid-api
+radiuid set target firewall01.example.com:1 password ********
+radiuid set target firewall01.example.com:1 port 443
+radiuid set client 10.0.0.0/8 mysecretkey
+radiuid set client 192.168.1.0/24 anothersecret
+```
 
-**Test your munge rule-set using the `request munge-test` command**
-![RadiUID][radiuid-munge-test]
+**Pushing a mapping and viewing mappings**
+
+```
+$ radiuid push firewall01.example.com:vsys1 jsmith 10.1.50.100
+Pushing UID mapping: jsmith -> 10.1.50.100 to firewall01.example.com:vsys1
+Successfully pushed UID mapping
+
+$ radiuid show mappings firewall01.example.com:vsys1
+================================================================================
+              USER-ID MAPPINGS: firewall01.example.com:vsys1
+================================================================================
+USER                                     IP ADDRESS        TIMEOUT
+--------------------------------------------------------------------------------
+MYDOMAIN\jsmith                          10.1.50.100       58 min
+MYDOMAIN\bgriffith                       10.1.50.101       45 min
+MYDOMAIN\asmith                          10.1.50.102       32 min
+--------------------------------------------------------------------------------
+Total: 3 mappings
+```
+
+**Test munge rules with `request munge-test`**
+
+```
+$ radiuid request munge-test "DOMAIN\\\\username" debug
+########################## MUNGE TEST ##########################
+################################################################
+
+Processing input: DOMAIN\\username
+
+Rule 101.0: match "\\\\.*" partial -> MATCHED
+  Step 101.10: set-variable domain from-match "^[a-zA-Z0-9]+" -> "DOMAIN"
+  Step 101.20: set-variable user from-match "[a-zA-Z0-9]+$" -> "username"
+  Step 101.30: set-variable slash from-string "\\" -> "\"
+  Step 101.40: assemble domain slash user -> "DOMAIN\username"
+
+String input from command line:  DOMAIN\\username
+
+String returned by Munge Engine: DOMAIN\username
+
+################################################################
+################################################################
+```
 
 
 --------------------------------------
@@ -79,7 +206,7 @@ Interpreter:		**Python 3.8+** *(Migrated from Python 2.7.X in v3.0.0)*
 
 PAN-OS Version:		**6.X, 7.X, 8.X, 9.X, 10.X, and 11.X**
 
-Dependencies:		**None** - Uses only Python standard library
+Dependencies:        **PyYAML** - `pip3 install pyyaml` (for YAML configuration)
 
 
 --------------------------------------
@@ -97,7 +224,14 @@ Authenticators: **Meraki Wireless Access Points, Cisco Wireless (Controller-base
 
 ----------------------------------------------
 ## DOCKER INSTALL INSTRUCTIONS
+
+> **Note:** The pre-built Docker images on Docker Hub (`packetsar/radiuid`) are from the original project and only
+> support **v2.5.0** (Python 2.7). They do not yet support v3.0.0. To run RadiUID v3.0.0 in Docker, you must build your
+> own image using the Dockerfiles in the [Docker Files](#dockerfiles) section below.
+
 Downloading and running RadiUID on a Docker host is the fastest and easiest way to get it up and running. There are two versions of the RadiUID image maintained on Docker Hub: an image **with SSH**, and an image **without SSH**. The image **with SSH** has the SSH server installed and pre-configured with a login username and password. All you have to do is change the password. The Dockerfile build scripts which were used to build the images are available in the [Docker Files](#dockerfiles) section in case you want to perform the build yourself.
+
+**Using Pre-built Images (v2.5.0 only):**
 
 1. From the Docker host, download and run the image in interactive mode
 	1. To run the image **with SSH**: `docker run -it -p 1813:1813/udp -p 1813:1813/tcp -p 222:22/tcp --name radiuid -t packetsar/radiuid-ssh:latest`
@@ -122,10 +256,12 @@ NOTE: You need to be logged in as root or have sudo privileges on the system to 
 	- Check out the [CentOS Minimal Server - Post-Install Setup][centos-post-install] and the [Ubuntu Server - Post Install Setup][ubuntu-post-install] for help with some of the post-OS-install configuration steps.
 2. Install the Git client (unless you already have the RadiUID files): `sudo yum install git -y` or `sudo apt install git -y`
 3. Clone the RadiUID repo to any location on the box: `git clone https://github.com/ghBrianG/radiuid.git`
-4. Change to the directory where the RadiUID main code file (radiuid.py) and config file (radiuid.conf) are stored: `cd radiuid`
+4. Change to the directory where the RadiUID main code file (radiuid.py) and config file (radiuid.yaml) are stored:
+   `cd radiuid`
 	- (OPTIONAL) Change to the development branch (perform this step only if you are prepared for a version which is under active development and may have broken features): `git checkout devX.X.X`
 5. Run the RadiUID program in install mode to perform the installation: `sudo python3 radiuid.py install`
-	- NOTE: Make sure that you have the .conf file in the same directory as the .py directory for the initial install
+    - NOTE: Make sure that you have the config file (radiuid.yaml or examples/radiuid.yaml.sample) in the same directory
+      for the initial install
 6. Follow the on-screen prompts to install FreeRADIUS and the RadiUID application
 	- The installer should let you know if everything installed correctly and services are running, but in the next section are the CLI commands you can run to check up on it.
 
@@ -151,8 +287,8 @@ Below is the CLI guide for the RadiUID service.
  - show log                                       |  Show the RadiUID log file
  - show acct-logs                                 |  Show the log files currently in the FreeRADIUS accounting directory
  - show livelog                                   |  Show current live log processing settings and status
- - show run (xml | set)                           |  Show the RadiUID configuration in XML format (default) or as set commands
- - show config (xml | set)                        |  Show the RadiUID configuration in XML format (default) or as set commands
+ - show run (yaml | set)                          |  Show the RadiUID configuration in YAML format (default) or as set commands
+ - show config (yaml | set)                       |  Show the RadiUID configuration in YAML format (default) or as set commands
  - show clients (file | table)                    |  Show the FreeRADIUS clients and config file
  - show status                                    |  Show the RadiUID and FreeRADIUS service statuses
  - show mappings (<target> | all | consistency)   |  Show the current IP-to-User mappings of one or all targets or check consistency
@@ -367,7 +503,8 @@ radiuid service radiuid restart
 
 **ADDED FEATURES:**
 
-- The RadiUID config file has been changed to a simpler XML format. Config file management no longer depends on the ConfigParser module.
+- The RadiUID config file uses YAML format (v3.0+). Legacy XML configurations are automatically migrated to YAML on
+  first load.
 
 - All configuration settings (including the RADIUS client configuration for FreeRADIUS) are configurable using `set` commands. Just type `radiuid set` and hit [ENTER] to see the options or type `show config set` and hit [ENTER] to see the current configuration as a series of `set` commands.
 
@@ -593,7 +730,7 @@ With the exposure of the `tlsversion` and `radiusstopaction` elements to configu
 - This is a breaking change - Python 2.7 is no longer supported
 - Minimum Python version: 3.8
 - All command examples now use `python3` instead of `python`
-- Zero external dependencies - uses only Python standard library
+- Single external dependency: PyYAML (for YAML configuration support)
 - Thoroughly test in your environment before deploying to production
 
 
@@ -633,8 +770,9 @@ With the exposure of the `tlsversion` and `radiusstopaction` elements to configu
 
 **Upgrading from v1.X to v2.X.X:**
 
-1. Change the name of your config file (/etc/radiuid/radiuid.conf) by issuing the command `mv /etc/radiuid/radiuid.conf /etc/radiuid/radiuid.conf.backup`
-2. Grab the contents to have them handy during the install of the new version `more /etc/radiuid/radiuid.conf.backup`
+1. Change the name of your config file (/etc/radiuid/radiuid.yaml) by issuing the command
+   `mv /etc/radiuid/radiuid.yaml /etc/radiuid/radiuid.yaml.backup`
+2. Grab the contents to have them handy during the install of the new version `more /etc/radiuid/radiuid.yaml.backup`
 3. Download the v2.X.X code from the GitHub repo by using `git clone https://github.com/PackeTsar/radiuid.git`
     - If the "radiuid" folder already exists, you may want to use git to update the clone `cd radiuid/; git pull`
 4. Move to the radiuid folder created by git using the `cd radiuid/` command
@@ -647,60 +785,80 @@ With the exposure of the `tlsversion` and `radiusstopaction` elements to configu
 --------------------------------------
 ## DOCKERFILES
 
-These are the dockerfile script files used to build the SSH and non-SSH Docker images hosted on [Docker Hub][docker-hub]. You can use these on a Docker host to build your own RadiUID image if you don't want to download the pre-made one from Docker Hub.
+These are the Dockerfile scripts to build RadiUID v3.0.0 Docker images. These use Rocky Linux (the community successor
+to CentOS) as the base image.
+
+> **Note:** The pre-built images on [Docker Hub][docker-hub] are from the original project and only support v2.5.0. Use
+> these Dockerfiles to build v3.0.0 images.
 
 **With SSH**
 
-    FROM centos:latest
-    MAINTAINER John W Kerns "jkerns@packetsar.com"
+```dockerfile
+FROM rockylinux:9
+LABEL maintainer="Brian Griffith"
 
-    ### Install and configure SSH Server for SSH access to container ###
-    RUN yum install -y openssh openssh-server openssh-clients sudo passwd
-    RUN sshd-keygen
-    RUN sed -i "s/UsePAM.*/UsePAM yes/g" /etc/ssh/sshd_config
-    RUN sed -i "s/#UsePrivilegeSeparation.*/UsePrivilegeSeparation no/g" /etc/ssh/sshd_config
-    RUN useradd admin -G wheel -s /bin/bash -m
-    RUN echo 'root:radiuid' | chpasswd
-    RUN echo '%wheel ALL=(ALL) ALL' >> /etc/sudoers
+### Install Python 3 and dependencies ###
+RUN dnf install -y python3 python3-pip curl tar
 
-    ### Download and install RadiUID from latest release ###
-    RUN curl -sL https://codeload.github.com/PackeTsar/radiuid/tar.gz/2.5.0 | tar xz
-    RUN cd radiuid-2.5.0;python3 radiuid.py request reinstall replace-config no-confirm
-    RUN cd radiuid-2.5.0;python3 radiuid.py request freeradius-install no-confirm
+### Install and configure SSH Server for SSH access to container ###
+RUN dnf install -y openssh openssh-server openssh-clients sudo passwd
+RUN ssh-keygen -A
+RUN sed -i "s/UsePAM.*/UsePAM yes/g" /etc/ssh/sshd_config
+RUN useradd admin -G wheel -s /bin/bash -m
+RUN echo 'root:radiuid' | chpasswd
+RUN echo '%wheel ALL=(ALL) ALL' >> /etc/sudoers
 
-    ### Expose ports and provide run commands ###
-    EXPOSE 1813/udp
-    EXPOSE 1813/tcp
-    EXPOSE 22/tcp
-    CMD radiusd & radiuid run >> /etc/radiuid/STDOUT & /usr/sbin/sshd >> /etc/radiuid/SSH-STDOUT & /bin/bash
+### Download and install RadiUID v3.0.0 ###
+RUN curl -sL https://codeload.github.com/ghBrianG/radiuid/tar.gz/v3.0.0 | tar xz
+RUN pip3 install pyyaml
+RUN cd radiuid-3.0.0 && python3 radiuid.py request reinstall replace-config no-confirm
+RUN cd radiuid-3.0.0 && python3 radiuid.py request freeradius-install no-confirm
+
+### Expose ports and provide run commands ###
+EXPOSE 1813/udp
+EXPOSE 1813/tcp
+EXPOSE 22/tcp
+CMD /usr/sbin/sshd && radiusd && radiuid run
+```
 
 **Without SSH**
 
-    FROM centos:latest
-    MAINTAINER John W Kerns "jkerns@packetsar.com"
+```dockerfile
+FROM rockylinux:9
+LABEL maintainer="Brian Griffith"
 
-    ### Download and install RadiUID from latest release ###
-    RUN curl -sL https://codeload.github.com/PackeTsar/radiuid/tar.gz/2.5.0 | tar xz
-    RUN cd radiuid-2.5.0;python3 radiuid.py request reinstall replace-config no-confirm
-    RUN cd radiuid-2.5.0;python3 radiuid.py request freeradius-install no-confirm
+### Install Python 3 and dependencies ###
+RUN dnf install -y python3 python3-pip curl tar
 
-    ### Expose ports and provide run commands ###
-    EXPOSE 1813/udp
-    EXPOSE 1813/tcp
-    CMD radiusd & radiuid run >> /etc/radiuid/STDOUT & /bin/bash
+### Download and install RadiUID v3.0.0 ###
+RUN curl -sL https://codeload.github.com/ghBrianG/radiuid/tar.gz/v3.0.0 | tar xz
+RUN pip3 install pyyaml
+RUN cd radiuid-3.0.0 && python3 radiuid.py request reinstall replace-config no-confirm
+RUN cd radiuid-3.0.0 && python3 radiuid.py request freeradius-install no-confirm
+
+### Expose ports and provide run commands ###
+EXPOSE 1813/udp
+EXPOSE 1813/tcp
+CMD radiusd && radiuid run
+```
 
 **Docker Build**
 
-To build your own Docker image: follow the instructions below
+To build your own Docker image:
 
-1. After installing Docker (`yum install docker` or an equivalent) and starting it up (`systemctl start docker` or an equivalent), create a new file called "Dockerfile": `vi Dockerfile`
-2. Paste in the text from one of the above scripts: Hit `i` to get into insert mode, and paste in the text, then hit ESC to leave insert mode, then type in `:wq` and hit ENTER to save and exit
-3. Build the Docker image using the command `docker build -t mydockerradiuidimage .` Docker will run through the script and install RadiUID and FreeRADIUS.
-4. You can now run the `docker images` command and see your new image
-5. To run the image, issue the command `docker run -it -p 1813:1813/udp -p 1813:1813/tcp -p 222:22/tcp --name radiuid -t mydockerradiuidimage`
-6. You will enter into interactive mode in the container where you can run `radiuid` commands. After you are done in the container, hit CTRL + P + Q to exit interactive mode but leave the container running.
-7. If you used the "With SSH" Dockerfile script, then you should be able to SSH to the Docker host's IP on port 222 to directly access the container.
-8. If you want to save this image to Docker Hub, use the command `docker push mydockerradiuidimage`.
+1. Install Docker on your system (`dnf install docker` or `apt install docker.io`) and start it (
+   `systemctl start docker`)
+2. Create a new file called `Dockerfile`: `vi Dockerfile`
+3. Paste in the text from one of the above scripts, save and exit (`:wq`)
+4. Build the Docker image: `docker build -t radiuid:3.0.0 .`
+5. Run the `docker images` command to verify the image was created
+6. To run the image: `docker run -it -p 1813:1813/udp -p 1813:1813/tcp --name radiuid -t radiuid:3.0.0`
+    - Add `-p 222:22/tcp` if using the SSH version
+7. You will enter interactive mode where you can run `radiuid` commands. Press CTRL+P then CTRL+Q to detach while
+   leaving the container running.
+8. If using the SSH Dockerfile, connect via SSH to port 222 on the Docker host
+9. To push to a registry:
+   `docker tag radiuid:3.0.0 yourregistry/radiuid:3.0.0 && docker push yourregistry/radiuid:3.0.0`
 
 
 --------------------------------------
@@ -713,12 +871,6 @@ Visit the GitHub page (https://github.com/ghBrianG/radiuid) and either report an
 **Original Project:** This is a fork of the original RadiUID project by John W Kerns (PackeTsar): https://github.com/PackeTsar/radiuid
 
 [logo]: /radiuid-logo-tiny-100.png
-[all-args]: http://www.packetsar.com/wp-content/uploads/radiuid-all-args.png
-[show-log]: http://www.packetsar.com/wp-content/uploads/radiuid-show-log.png
 [docker-hub]: https://hub.docker.com/r/packetsar/
-[show-config]: http://www.packetsar.com/wp-content/uploads/radiuid-show-config.png
-[show-config-set]: http://www.packetsar.com/wp-content/uploads/radiuid-show-config-set.png
-[push-and-show]: http://www.packetsar.com/wp-content/uploads/radiuid-push-and-show.png
-[radiuid-munge-test]: http://www.packetsar.com/wp-content/uploads/radiuid-munge-test.png
 [centos-post-install]: https://github.com/PackeTsar/scriptfury/blob/master/CentOS_Post_Install.md
 [ubuntu-post-install]: https://github.com/PackeTsar/scriptfury/blob/master/Ubuntu_Post_Install.md

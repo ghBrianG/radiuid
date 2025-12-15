@@ -5,8 +5,6 @@ Handles all 'clear' CLI commands for RadiUID
 """
 
 import os
-import sys
-import re
 import time
 from typing import TYPE_CHECKING, List
 

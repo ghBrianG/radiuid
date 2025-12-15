@@ -6,15 +6,15 @@ Interactive wizard for RadiUID installation and configuration
 
 import os
 import sys
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 
-from ..logging_config import get_logger
-from ..context import AppContext, get_context
+from .system_setup import ServiceController, SystemInstaller
 from ..constants import VERSION
-from ..ui.interface import UserInterface
+from ..context import AppContext, get_context
 from ..core.config_manager import ConfigManager
 from ..core.file_manager import FileManager
-from .system_setup import ServiceController, SystemInstaller
+from ..logging_config import get_logger
+from ..ui.interface import UserInterface
 
 
 class InstallationWizard:
@@ -193,7 +193,8 @@ class InstallationWizard:
         self.ui.progress('Reading:', 1)
 
         # Ask questions for settings
-        print("\n\n\n\n\n\n****************Please enter values for the different settings in the radiuid.conf file****************\n")
+        print(
+            "\n\n\n\n\n\n****************Please enter values for the different settings in the radiuid.yaml file****************\n")
 
         logfile = self.context.config.log_file
         newlogfile = self._change_setting(logfile, 'Enter full path to the new RadiUID Log File')
@@ -270,7 +271,8 @@ class InstallationWizard:
         if applysettings == 'no':
             print("~~~ OK. Disregarding config changes...")
         else:
-            print("\n\n\n\n\n\n****************Applying entered settings into the radiuid.conf file...****************\n")
+            print(
+                "\n\n\n\n\n\n****************Applying entered settings into the radiuid.yaml file...****************\n")
             self.ui.progress('Applying:', 1)
             self.config_manager.save()
 

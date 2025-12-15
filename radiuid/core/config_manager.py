@@ -1,25 +1,66 @@
 #!/usr/bin/env python3
 """
 Configuration Manager Module
-Handles XML configuration parsing, loading, saving, and modification
+Handles YAML configuration parsing, loading, saving, and modification.
+Includes migration support for legacy XML configuration files.
 """
 
-import re
 import os
-from typing import Dict, List, Any, Optional, Union
-from xml.etree import ElementTree
+import re
+from typing import Dict, List, Any, Optional
 
-from ..context import AppContext, RadiUIDConfig, FirewallTarget, get_context
+import yaml
+
+from ..constants import Paths
+from ..context import AppContext, FirewallTarget, get_context
 from ..logging_config import get_logger
 from ..ui.interface import UserInterface
-from ..constants import Paths
 
 logger = get_logger('config_manager')
+
+# Default configuration template
+DEFAULT_CONFIG = {
+    'paths': {
+        'radius_log_path': '/var/log/radius/radacct/',
+        'log_file': '/etc/radiuid/radiuid.log',
+        'acct_log_copy_path': None,
+    },
+    'logging': {
+        'max_log_lines': 0,
+    },
+    'uid_settings': {
+        'user_domain': 'domain.com',
+        'timeout': 60,
+    },
+    'search_terms': {
+        'ip_address_term': 'Framed-IP-Address',
+        'username_term': 'User-Name',
+        'delineator_term': '[PARAGRAPH]',
+    },
+    'misc': {
+        'loop_time': 10,
+        'tls_version': '1.2',
+        'radius_stop_action': 'clear',
+        'max_uids_per_call': 50,
+    },
+    'livelog': {
+        'enabled': False,
+        'file': None,
+        'tracker': '/var/lib/radiuid/livelog_tracker',
+    },
+    'nps_csv': {
+        'ip_column': 0,
+        'username_column': 1,
+        'packet_type_column': 6,
+    },
+    'munge': {},
+    'targets': {},
+}
 
 
 class ConfigManager:
     """
-    Manages RadiUID XML configuration files.
+    Manages RadiUID YAML configuration files.
     Handles loading, parsing, modifying, and saving configuration.
     """
 
@@ -33,13 +74,20 @@ class ConfigManager:
         """
         self.context = context or get_context()
         self.ui = ui or UserInterface()
+        self._config_data: Dict[str, Any] = {}
 
     def find_config_file(self, preferred: str = None, alternate: str = None) -> str:
         """
         Locate the configuration file.
 
+        Searches in order:
+        1. Preferred path (default: /etc/radiuid/radiuid.yaml)
+        2. Legacy preferred path (.conf extension)
+        3. Alternate path in working directory (.yaml)
+        4. Legacy alternate path (.conf)
+
         Args:
-            preferred: Preferred config path (default: /etc/radiuid/radiuid.conf)
+            preferred: Preferred config path (default: /etc/radiuid/radiuid.yaml)
             alternate: Alternate path in working directory
 
         Returns:
@@ -49,20 +97,26 @@ class ConfigManager:
             FileNotFoundError: If no config file is found
         """
         preferred = preferred or Paths.ETC_CONFIG_FILE
-        alternate = alternate or os.path.join(os.getcwd(), 'radiuid.conf')
+        alternate = alternate or os.path.join(os.getcwd(), 'radiuid.yaml')
 
-        if os.path.exists(preferred):
-            return preferred
-        elif os.path.exists(alternate):
-            return alternate
-        else:
-            raise FileNotFoundError(
-                f"Configuration file not found in {preferred} or {alternate}"
-            )
+        # Also check legacy .conf paths
+        preferred_legacy = preferred.replace('.yaml', '.conf') if preferred.endswith('.yaml') else None
+        alternate_legacy = alternate.replace('.yaml', '.conf') if alternate.endswith('.yaml') else None
+
+        # Check paths in order of preference
+        search_paths = [preferred, preferred_legacy, alternate, alternate_legacy]
+        for path in search_paths:
+            if path and os.path.exists(path):
+                return path
+
+        raise FileNotFoundError(
+            f"Configuration file not found. Searched: {preferred}, {alternate}"
+        )
 
     def load(self, config_path: str = None, mode: str = 'quiet') -> None:
         """
-        Load configuration from XML file.
+        Load configuration from YAML file.
+        Automatically detects and migrates XML configuration files.
 
         Args:
             config_path: Path to config file (auto-detects if not provided)
@@ -76,26 +130,38 @@ class ConfigManager:
 
         # Read the config file
         with open(config_path, 'r') as f:
-            xml_data = f.read()
+            content = f.read()
 
-        # Extract and preserve the XML comment block
-        comment_regex = r"(?s)<!--.*-->"
-        comment_match = re.findall(comment_regex, xml_data)
-        if comment_match:
-            self.context.config_comment = comment_match[0]
-            cleaned_xml = xml_data.replace(self.context.config_comment, "")
+        # Detect XML format and migrate if needed
+        if content.strip().startswith('<') or '<?xml' in content:
+            if mode == 'noisy':
+                logger.info("Detected legacy XML configuration, migrating to YAML...")
+            self._config_data = self._migrate_xml_to_yaml(content)
+
+            # Rename file from .conf to .yaml if needed
+            if config_path.endswith('.conf'):
+                new_path = config_path[:-5] + '.yaml'  # Replace .conf with .yaml
+                try:
+                    os.rename(config_path, new_path)
+                    logger.info(f"Renamed config file: {config_path} -> {new_path}")
+                    config_path = new_path
+                except OSError as e:
+                    logger.warning(f"Could not rename config file: {e}")
+
+            # Save migrated config
+            self.context.config.config_file = config_path
+            self.save()
+            logger.info(f"Migrated XML configuration to YAML: {config_path}")
         else:
-            self.context.config_comment = ""
-            cleaned_xml = xml_data
+            # Parse YAML
+            self._config_data = yaml.safe_load(content) or {}
 
-        # Parse XML
-        self.context.config_root = ElementTree.fromstring(cleaned_xml)
         self.context.config.config_file = config_path
 
-        # Extend schema if needed
+        # Ensure all sections exist with defaults
         self._extend_config_schema()
 
-        # Publish configuration values
+        # Publish configuration values to context
         self._publish_config(mode)
 
         self.context.mark_initialized()
@@ -104,88 +170,65 @@ class ConfigManager:
             logger.info("Configuration loaded successfully")
 
     def _extend_config_schema(self) -> None:
-        """Add missing configuration elements for schema migration."""
-        root = self.context.config_root
-        if root is None:
-            return
+        """Add missing configuration sections with defaults."""
+        for key, default_value in DEFAULT_CONFIG.items():
+            if key not in self._config_data:
+                self._config_data[key] = default_value
+                logger.debug(f"Extended config schema: added {key}")
+            elif isinstance(default_value, dict):
+                # Ensure nested keys exist
+                for sub_key, sub_default in default_value.items():
+                    if sub_key not in self._config_data[key]:
+                        self._config_data[key][sub_key] = sub_default
+                        logger.debug(f"Extended config schema: added {key}.{sub_key}")
 
-        # Find globalsettings element
-        globalsettings = root.find('.//globalsettings')
-        if globalsettings is None:
-            return
-
-        # Add misc element if missing
-        if root.find('.//misc') is None:
-            misc = ElementTree.SubElement(globalsettings, 'misc')
-            looptime = ElementTree.SubElement(misc, 'looptime')
-            looptime.text = "10"
-            tlsversion = ElementTree.SubElement(misc, 'tlsversion')
-            tlsversion.text = "1.2"
-            stop_action = ElementTree.SubElement(misc, 'radiusstopaction')
-            stop_action.text = "clear"
-            logger.debug("Extended config schema: added misc element")
-
-        # Add acctlogcopypath if missing
-        if root.find('.//acctlogcopypath') is None:
-            paths = globalsettings.find('paths')
-            if paths is not None:
-                acctlogcopypath = ElementTree.SubElement(paths, 'acctlogcopypath')
-                acctlogcopypath.text = None
-                logger.debug("Extended config schema: added acctlogcopypath")
+    def extend_config_schema(self) -> None:
+        """Public method to extend config schema (for reinstall compatibility)."""
+        self._extend_config_schema()
 
     def _publish_config(self, mode: str = 'quiet') -> None:
         """
-        Extract values from XML and populate the context config.
+        Extract values from YAML and populate the context config.
 
         Args:
             mode: 'noisy' for verbose logging
         """
-        config_dict = self.tinyxmltodict(self.context.config_root)
-        if 'config' not in config_dict:
-            logger.warning("Invalid configuration: missing root 'config' element")
-            return
-
-        config_data = config_dict['config']
         cfg = self.context.config
+        data = self._config_data
 
-        # Extract global settings
         try:
-            gs = config_data.get('globalsettings', {})
-
             # Paths
-            paths = gs.get('paths', {})
-            cfg.log_file = paths.get('logfile', cfg.log_file)
-            cfg.radius_log_path = paths.get('radiuslogpath', cfg.radius_log_path)
-            acct_copy = paths.get('acctlogcopypath')
-            cfg.acct_log_copy_path = acct_copy if acct_copy else None
-            xml_output = paths.get('xmloutputpath')
-            cfg.xml_output_path = xml_output if xml_output else None
+            paths = data.get('paths', {})
+            cfg.log_file = paths.get('log_file', cfg.log_file)
+            cfg.radius_log_path = paths.get('radius_log_path', cfg.radius_log_path)
+            cfg.acct_log_copy_path = paths.get('acct_log_copy_path')
+            cfg.xml_output_path = paths.get('xml_output_path')
 
             # Logging
-            logging_cfg = gs.get('logging', {})
-            max_lines = logging_cfg.get('maxloglines', str(cfg.max_log_lines))
-            cfg.max_log_lines = int(max_lines) if max_lines else 10000
+            logging_cfg = data.get('logging', {})
+            cfg.max_log_lines = int(logging_cfg.get('max_log_lines', cfg.max_log_lines))
 
             # UID Settings
-            uid_settings = gs.get('uidsettings', {})
-            domain = uid_settings.get('userdomain')
-            cfg.user_domain = domain if domain and domain.lower() != 'none' else None
+            uid_settings = data.get('uid_settings', {})
+            domain = uid_settings.get('user_domain')
+            cfg.user_domain = domain if domain and str(domain).lower() != 'none' else None
             cfg.timeout = int(uid_settings.get('timeout', cfg.timeout))
 
             # Misc
-            misc = gs.get('misc', {})
-            cfg.loop_time = int(misc.get('looptime', cfg.loop_time))
-            cfg.tls_version = misc.get('tlsversion', cfg.tls_version)
-            cfg.radius_stop_action = misc.get('radiusstopaction', cfg.radius_stop_action)
+            misc = data.get('misc', {})
+            cfg.loop_time = int(misc.get('loop_time', cfg.loop_time))
+            cfg.tls_version = str(misc.get('tls_version', cfg.tls_version))
+            cfg.radius_stop_action = misc.get('radius_stop_action', cfg.radius_stop_action)
+            cfg.max_uids_per_call = int(misc.get('max_uids_per_call', 50))
 
             # Search Terms
-            search_terms = gs.get('searchterms', {})
-            cfg.ip_address_term = search_terms.get('ipaddressterm', cfg.ip_address_term)
-            cfg.username_term = search_terms.get('usernameterm', cfg.username_term)
-            cfg.delineator_term = search_terms.get('delineatorterm', cfg.delineator_term)
+            search_terms = data.get('search_terms', {})
+            cfg.ip_address_term = search_terms.get('ip_address_term', cfg.ip_address_term)
+            cfg.username_term = search_terms.get('username_term', cfg.username_term)
+            cfg.delineator_term = search_terms.get('delineator_term', cfg.delineator_term)
 
             # Munge configuration
-            munge = gs.get('munge')
+            munge = data.get('munge', {})
             if munge:
                 cfg.munge_config = munge
                 cfg.to_munge = True
@@ -193,14 +236,26 @@ class ConfigManager:
                 cfg.munge_config = None
                 cfg.to_munge = False
 
-            # Live log settings (for NPS/continuously written logs)
-            livelog = gs.get('livelog', {})
-            live_file = livelog.get('file')
-            cfg.live_log_file = live_file if live_file else None
-            live_tracker = livelog.get('tracker')
-            cfg.live_log_tracker = live_tracker if live_tracker else None
-            live_enabled = livelog.get('enabled', 'false')
-            cfg.live_log_enabled = live_enabled.lower() in ('true', '1', 'yes', 'on')
+            # Live log settings
+            livelog = data.get('livelog', {})
+            cfg.live_log_file = livelog.get('file')
+            cfg.live_log_tracker = livelog.get('tracker')
+            live_enabled = livelog.get('enabled', False)
+            if isinstance(live_enabled, bool):
+                cfg.live_log_enabled = live_enabled
+            else:
+                cfg.live_log_enabled = str(live_enabled).lower() in ('true', '1', 'yes', 'on')
+
+            # NPS CSV parsing settings (column indices are 0-based)
+            # Set column to -1 or null to enable auto-detection mode, which uses
+            # RADIUS attribute numbers in the CSV to find IP/username fields
+            nps_csv = data.get('nps_csv', {})
+            ip_col = nps_csv.get('ip_column', 0)
+            cfg.nps_ip_column = int(ip_col) if ip_col is not None else -1
+            username_col = nps_csv.get('username_column', 1)
+            cfg.nps_username_column = int(username_col) if username_col is not None else -1
+            pkt_col = nps_csv.get('packet_type_column', 6)
+            cfg.nps_packet_type_column = int(pkt_col) if pkt_col is not None else -1
 
             if mode == 'noisy':
                 logger.info(f"Loaded log_file: {cfg.log_file}")
@@ -215,14 +270,15 @@ class ConfigManager:
 
         # Extract targets
         try:
-            targets_data = config_data.get('targets', {}).get('target', [])
+            targets_data = data.get('targets', {})
             if targets_data:
-                # Ensure it's a list
-                if not isinstance(targets_data, list):
-                    targets_data = [targets_data]
-
                 self.context.targets.clear()
-                for target_dict in targets_data:
+                for target_key, target_dict in targets_data.items():
+                    # Parse key format: "hostname:vsys"
+                    if ':' in target_key:
+                        hostname, vsys = target_key.rsplit(':', 1)
+                        target_dict['hostname'] = hostname
+                        target_dict['vsys'] = vsys
                     target = FirewallTarget.from_dict(target_dict)
                     self.context.targets.append(target)
 
@@ -236,190 +292,200 @@ class ConfigManager:
         if not self.context.config.config_file:
             raise ValueError("No configuration file path set")
 
-        if self.context.config_root is None:
-            raise ValueError("No configuration loaded")
+        # Update config data from context before saving
+        self._sync_config_from_context()
 
-        # Combine comment and XML
-        formatted_xml = self.formatxml(
-            ElementTree.tostring(self.context.config_root, encoding='unicode')
-        )
-        new_config = self.context.config_comment + "\n" + formatted_xml
+        # Generate YAML with comments
+        yaml_content = self._generate_yaml_with_header()
 
         with open(self.context.config.config_file, 'w') as f:
-            f.write(new_config)
+            f.write(yaml_content)
 
         logger.info(f"Configuration saved to {self.context.config.config_file}")
+
+    def _sync_config_from_context(self) -> None:
+        """Sync configuration data from context before saving."""
+        cfg = self.context.config
+
+        # Paths
+        self._config_data.setdefault('paths', {})
+        self._config_data['paths']['radius_log_path'] = cfg.radius_log_path
+        self._config_data['paths']['log_file'] = cfg.log_file
+        self._config_data['paths']['acct_log_copy_path'] = cfg.acct_log_copy_path
+
+        # Logging
+        self._config_data.setdefault('logging', {})
+        self._config_data['logging']['max_log_lines'] = cfg.max_log_lines
+
+        # UID Settings
+        self._config_data.setdefault('uid_settings', {})
+        self._config_data['uid_settings']['user_domain'] = cfg.user_domain or ''
+        self._config_data['uid_settings']['timeout'] = cfg.timeout
+
+        # Misc
+        self._config_data.setdefault('misc', {})
+        self._config_data['misc']['loop_time'] = cfg.loop_time
+        self._config_data['misc']['tls_version'] = cfg.tls_version
+        self._config_data['misc']['radius_stop_action'] = cfg.radius_stop_action
+        self._config_data['misc']['max_uids_per_call'] = cfg.max_uids_per_call
+
+        # Search Terms
+        self._config_data.setdefault('search_terms', {})
+        self._config_data['search_terms']['ip_address_term'] = cfg.ip_address_term
+        self._config_data['search_terms']['username_term'] = cfg.username_term
+        self._config_data['search_terms']['delineator_term'] = cfg.delineator_term
+
+        # Live log
+        self._config_data.setdefault('livelog', {})
+        self._config_data['livelog']['enabled'] = cfg.live_log_enabled
+        self._config_data['livelog']['file'] = cfg.live_log_file
+        self._config_data['livelog']['tracker'] = cfg.live_log_tracker
+
+        # NPS CSV settings
+        self._config_data.setdefault('nps_csv', {})
+        self._config_data['nps_csv']['ip_column'] = cfg.nps_ip_column
+        self._config_data['nps_csv']['username_column'] = cfg.nps_username_column
+        self._config_data['nps_csv']['packet_type_column'] = cfg.nps_packet_type_column
+
+        # Munge
+        self._config_data['munge'] = cfg.munge_config or {}
+
+        # Targets
+        targets_dict = {}
+        for target in self.context.targets:
+            key = f"{target.hostname}:{target.vsys}"
+            targets_dict[key] = {
+                'hostname': target.hostname,
+                'vsys': target.vsys,
+                'username': target.username,
+                'password': target.password,
+                'port': target.port,
+            }
+        self._config_data['targets'] = targets_dict
+
+    def _generate_yaml_with_header(self) -> str:
+        """Generate YAML content with a descriptive header."""
+        header = """# ==============================================================================
+# RadiUID Configuration File
+# ==============================================================================
+# https://github.com/ghBrianG/radiuid
+# ==============================================================================
+
+"""
+        yaml_content = yaml.dump(
+            self._config_data,
+            default_flow_style=False,
+            sort_keys=False,
+            allow_unicode=True
+        )
+        return header + yaml_content
 
     def get_config_item(self, element_name: str) -> Optional[str]:
         """
         Get a single configuration element value.
 
         Args:
-            element_name: Name of the XML element
+            element_name: Name of the config element (supports dot notation)
 
         Returns:
-            Element text value or None
+            Element value or None
         """
-        if self.context.config_root is None:
-            return None
+        # Map old XML element names to new YAML paths
+        name_mapping = {
+            'logfile': 'paths.log_file',
+            'radiuslogpath': 'paths.radius_log_path',
+            'acctlogcopypath': 'paths.acct_log_copy_path',
+            'xmloutputpath': 'paths.xml_output_path',
+            'maxloglines': 'logging.max_log_lines',
+            'userdomain': 'uid_settings.user_domain',
+            'timeout': 'uid_settings.timeout',
+            'looptime': 'misc.loop_time',
+            'tlsversion': 'misc.tls_version',
+            'radiusstopaction': 'misc.radius_stop_action',
+            'ipaddressterm': 'search_terms.ip_address_term',
+            'usernameterm': 'search_terms.username_term',
+            'delineatorterm': 'search_terms.delineator_term',
+        }
 
-        for value in self.context.config_root.iter(element_name):
-            return str(value.text) if value.text else None
-        return None
+        path = name_mapping.get(element_name, element_name)
+        parts = path.split('.')
+
+        value = self._config_data
+        for part in parts:
+            if isinstance(value, dict) and part in value:
+                value = value[part]
+            else:
+                return None
+
+        return str(value) if value is not None else None
 
     def set_config_item(self, element_name: str, new_value: str) -> None:
         """
         Set a configuration element value.
 
         Args:
-            element_name: Name of the XML element
-            new_value: New text value
+            element_name: Name of the config element
+            new_value: New value
         """
-        if self.context.config_root is None:
-            raise ValueError("No configuration loaded")
-
-        for element in self.context.config_root.iter(element_name):
-            element.text = new_value
-            return
-
-        # Element not found - create it in the appropriate location
-        self._create_config_element(element_name, new_value)
-
-    def _create_config_element(self, element_name: str, value: str) -> None:
-        """
-        Create a new configuration element in the appropriate section.
-
-        Args:
-            element_name: Name of the element to create
-            value: Value for the new element
-        """
-        root = self.context.config_root
-        if root is None:
-            return
-
-        # Map element names to their parent paths
-        path_elements = {
-            'logfile': './/globalsettings/paths',
-            'radiuslogpath': './/globalsettings/paths',
-            'acctlogcopypath': './/globalsettings/paths',
-            'xmloutputpath': './/globalsettings/paths',
-            'maxloglines': './/globalsettings/logging',
-            'userdomain': './/globalsettings/uidsettings',
-            'timeout': './/globalsettings/uidsettings',
-            'looptime': './/globalsettings/misc',
-            'tlsversion': './/globalsettings/misc',
-            'radiusstopaction': './/globalsettings/misc',
-            'ipaddressterm': './/globalsettings/searchterms',
-            'usernameterm': './/globalsettings/searchterms',
-            'delineatorterm': './/globalsettings/searchterms',
+        # Map old XML element names to new YAML paths
+        name_mapping = {
+            'logfile': ('paths', 'log_file'),
+            'radiuslogpath': ('paths', 'radius_log_path'),
+            'acctlogcopypath': ('paths', 'acct_log_copy_path'),
+            'xmloutputpath': ('paths', 'xml_output_path'),
+            'maxloglines': ('logging', 'max_log_lines'),
+            'userdomain': ('uid_settings', 'user_domain'),
+            'timeout': ('uid_settings', 'timeout'),
+            'looptime': ('misc', 'loop_time'),
+            'tlsversion': ('misc', 'tls_version'),
+            'radiusstopaction': ('misc', 'radius_stop_action'),
+            'ipaddressterm': ('search_terms', 'ip_address_term'),
+            'usernameterm': ('search_terms', 'username_term'),
+            'delineatorterm': ('search_terms', 'delineator_term'),
         }
 
-        parent_path = path_elements.get(element_name)
-        if parent_path:
-            parent = root.find(parent_path)
-            if parent is not None:
-                new_elem = ElementTree.SubElement(parent, element_name)
-                new_elem.text = value
-                logger.info(f"Created new configuration element: {element_name}")
-                return
-
-        logger.warning(f"Could not create element '{element_name}' - parent path not found")
+        if element_name in name_mapping:
+            section, key = name_mapping[element_name]
+            self._config_data.setdefault(section, {})[key] = new_value
+        else:
+            logger.warning(f"Unknown config element: {element_name}")
 
     def change_config_item(self, section: str, element_name: str, new_value: str) -> None:
         """
         Set or create a configuration element within a section.
 
         Args:
-            section: Parent section name (e.g., 'livelog', 'paths')
+            section: Parent section name
             element_name: Name of the element to set
             new_value: New value for the element
         """
-        if self.context.config_root is None:
-            raise ValueError("No configuration loaded")
+        self._config_data.setdefault(section, {})[element_name] = new_value
+        logger.info(f"Set {section}.{element_name} = {new_value}")
 
-        root = self.context.config_root
-
-        # Map section names to their parent paths
-        section_paths = {
-            'paths': './/globalsettings/paths',
-            'logging': './/globalsettings/logging',
-            'uidsettings': './/globalsettings/uidsettings',
-            'misc': './/globalsettings/misc',
-            'searchterms': './/globalsettings/searchterms',
-            'livelog': './/globalsettings/livelog',
-        }
-
-        parent_path = section_paths.get(section)
-        if not parent_path:
-            logger.warning(f"Unknown section '{section}'")
-            return
-
-        # Find or create the parent section
-        parent = root.find(parent_path)
-        if parent is None:
-            # Need to create the section
-            globalsettings = root.find('.//globalsettings')
-            if globalsettings is None:
-                logger.warning("No globalsettings section found in config")
-                return
-            parent = ElementTree.SubElement(globalsettings, section)
-            logger.info(f"Created new section: {section}")
-
-        # Find or create the element
-        element = parent.find(element_name)
-        if element is None:
-            element = ElementTree.SubElement(parent, element_name)
-            logger.info(f"Created new element: {section}/{element_name}")
-
-        element.text = new_value
-        logger.info(f"Set {section}/{element_name} = {new_value}")
-
-    def show_config_item(self, output_format: str, mode: str, element_name: str) -> None:
+    def show_config_item(self, _output_format: str, _mode: str, element_name: str) -> None:
         """
         Display a configuration element.
 
         Args:
-            output_format: 'xml' for XML format, 'text' for plain text
-            mode: Display mode (unused, for compatibility)
-            element_name: Name of the XML element to display
+            _output_format: Reserved for future format options
+            _mode: Reserved for future display modes
+            element_name: Name of the element to display
         """
-        if self.context.config_root is None:
-            print("No configuration loaded")
-            return
-
-        # Handle special cases for complex elements
         if element_name == 'targets':
-            targets_elem = self.context.config_root.find('.//targets')
-            if targets_elem is not None:
-                xml_str = ElementTree.tostring(targets_elem, encoding='unicode')
-                print(self._format_xml(xml_str))
+            targets = self._config_data.get('targets', {})
+            print(yaml.dump({'targets': targets}, default_flow_style=False))
             return
 
         if element_name == 'munge':
-            munge_elem = self.context.config_root.find('.//munge')
-            if munge_elem is not None:
-                xml_str = ElementTree.tostring(munge_elem, encoding='unicode')
-                print(self._format_xml(xml_str))
+            munge = self._config_data.get('munge', {})
+            print(yaml.dump({'munge': munge}, default_flow_style=False))
             return
 
-        # Simple elements
-        for element in self.context.config_root.iter(element_name):
-            if output_format == 'xml':
-                xml_str = ElementTree.tostring(element, encoding='unicode')
-                print(self._format_xml(xml_str))
-            else:
-                print(f"{element_name}: {element.text}")
-            return
-
-        print(f"Element '{element_name}' not found in configuration")
-
-    def _format_xml(self, xml_string: str) -> str:
-        """Format XML string with proper indentation."""
-        import re
-        # Simple XML formatting
-        result = xml_string
-        result = re.sub(r'>\s*<', '>\n<', result)
-        return result
+        value = self.get_config_item(element_name)
+        if value is not None:
+            print(f"{element_name}: {value}")
+        else:
+            print(f"Element '{element_name}' not found in configuration")
 
     def add_target(self, target_data: Dict[str, str]) -> Dict[str, Any]:
         """
@@ -432,12 +498,6 @@ class ConfigManager:
             Result dictionary with status and messages
         """
         result = {'status': 'processing', 'messages': []}
-        root = self.context.config_root
-
-        if root is None:
-            result['status'] = 'error'
-            result['messages'].append('No configuration loaded')
-            return result
 
         hostname = target_data.get('hostname')
         vsys = target_data.get('vsys', '1')
@@ -447,56 +507,24 @@ class ConfigManager:
             result['messages'].append('hostname is required')
             return result
 
-        # Find or create targets element
-        targets_elem = root.find('.//targets')
-        if targets_elem is None:
-            targets_elem = ElementTree.SubElement(root, 'targets')
+        key = f"{hostname}:{vsys}"
+        targets = self._config_data.setdefault('targets', {})
 
-        # Check if target already exists
-        existing_target = None
-        for target in root.findall('.//target'):
-            host_elem = target.find('hostname')
-            vsys_elem = target.find('vsys')
-            if (host_elem is not None and host_elem.text == hostname and
-                vsys_elem is not None and vsys_elem.text == vsys):
-                existing_target = target
-                break
-
-        if existing_target is not None:
-            # Update existing target
-            result['messages'].append(f'Updating existing target {hostname}:vsys{vsys}')
-            for param, value in target_data.items():
-                if param not in ('hostname', 'vsys'):
-                    param_elem = existing_target.find(param)
-                    if param_elem is not None:
-                        param_elem.text = value
-                    else:
-                        new_elem = ElementTree.SubElement(existing_target, param)
-                        new_elem.text = value
-                    result['messages'].append(f'Set {param} = {value}')
+        if key in targets:
+            result['messages'].append(f'Updating existing target {key}')
+            targets[key].update(target_data)
         else:
-            # Create new target
-            target = ElementTree.SubElement(targets_elem, 'target')
-            result['messages'].append(f'Created new target {hostname}:vsys{vsys}')
+            result['messages'].append(f'Created new target {key}')
+            targets[key] = target_data
 
-            # Add hostname and vsys first
-            hostname_elem = ElementTree.SubElement(target, 'hostname')
-            hostname_elem.text = hostname
-            vsys_elem = ElementTree.SubElement(target, 'vsys')
-            vsys_elem.text = vsys
-
-            # Add other parameters
-            for param, value in target_data.items():
-                if param not in ('hostname', 'vsys'):
-                    param_elem = ElementTree.SubElement(target, param)
-                    param_elem.text = value
-                    result['messages'].append(f'Set {param} = {value}')
+        for param, value in target_data.items():
+            if param not in ('hostname', 'vsys'):
+                result['messages'].append(f'Set {param} = {value}')
 
         # Update context targets
         fw_target = FirewallTarget.from_dict(target_data)
         self.context.add_target(fw_target)
 
-        self._format_targets_xml()
         result['status'] = 'success'
         return result
 
@@ -512,218 +540,24 @@ class ConfigManager:
             Result dictionary with status and messages
         """
         result = {'status': 'fail', 'messages': []}
-        root = self.context.config_root
 
-        if root is None:
-            result['messages'].append('No configuration loaded')
-            return result
+        key = f"{hostname}:{vsys}"
+        targets = self._config_data.get('targets', {})
 
-        targets_elem = root.find('.//targets')
-        if targets_elem is None:
-            result['messages'].append('No targets exist')
-            return result
+        if key in targets:
+            del targets[key]
+            self.context.remove_target(hostname, vsys)
+            result['status'] = 'success'
+            result['messages'].append(f'Removed target {key}')
+        else:
+            result['messages'].append(f'Target {key} not found')
 
-        for target in root.findall('.//target'):
-            host_elem = target.find('hostname')
-            vsys_elem = target.find('vsys')
-            if (host_elem is not None and host_elem.text == hostname and
-                vsys_elem is not None and vsys_elem.text == vsys):
-                targets_elem.remove(target)
-                self.context.remove_target(hostname, vsys)
-                result['status'] = 'success'
-                result['messages'].append(f'Removed target {hostname}:vsys{vsys}')
-
-                # If no targets remain, remove the targets element
-                if len(list(targets_elem)) == 0:
-                    root.remove(targets_elem)
-
-                return result
-
-        result['messages'].append(f'Target {hostname}:vsys{vsys} not found')
         return result
 
     def clear_all_targets(self) -> None:
         """Remove all targets from configuration."""
-        root = self.context.config_root
-        if root is None:
-            return
-
-        targets_elem = root.find('.//targets')
-        if targets_elem is not None:
-            root.remove(targets_elem)
-
-        # Update globalsettings tail
-        gs = root.find('.//globalsettings')
-        if gs is not None:
-            gs.tail = '\n'
-
+        self._config_data['targets'] = {}
         self.context.clear_targets()
-
-    def _format_targets_xml(self) -> None:
-        """Format XML indentation for targets."""
-        root = self.context.config_root
-        if root is None:
-            return
-
-        gs = root.find('.//globalsettings')
-        if gs is not None:
-            gs.tail = "\n\t"
-
-        targets = root.find('.//targets')
-        if targets is None:
-            return
-
-        targets.text = "\n\t\t"
-        targets.tail = "\n"
-
-        target_list = list(targets)
-        for i, target in enumerate(target_list):
-            target.text = "\n\t\t\t"
-            params = list(target)
-            for j, param in enumerate(params):
-                if j == len(params) - 1:
-                    param.tail = "\n\t\t"
-                else:
-                    param.tail = "\n\t\t\t"
-
-            if i == len(target_list) - 1:
-                target.tail = "\n\t"
-            else:
-                target.tail = "\n\t\t"
-
-    # ============================================================
-    # XML Conversion Utilities
-    # ============================================================
-
-    def tinyxmltodict(self, input_data: Union[str, ElementTree.Element]) -> Dict[str, Any]:
-        """
-        Convert XML to nested dictionary.
-
-        Args:
-            input_data: XML string, file path, or ElementTree Element
-
-        Returns:
-            Dictionary representation of the XML
-        """
-        if isinstance(input_data, str):
-            if "<" not in input_data:
-                # Assume it's a file path
-                with open(input_data, 'r') as f:
-                    xml_data = f.read()
-                root = ElementTree.fromstring(xml_data)
-            else:
-                root = ElementTree.fromstring(input_data)
-        elif isinstance(input_data, ElementTree.Element):
-            root = input_data
-        else:
-            xml_str = ElementTree.tostring(input_data, encoding='unicode')
-            root = ElementTree.fromstring(xml_str)
-
-        return {root.tag: self._xmltodict_recurse(root)}
-
-    def _xmltodict_recurse(self, node: ElementTree.Element) -> Any:
-        """Recursive helper for XML to dict conversion."""
-        attribute_key = "attributes"
-
-        if len(list(node)) == 0 and len(node.items()) == 0:
-            return node.text
-
-        result = {}
-
-        # Handle attributes
-        if len(node.items()) > 0:
-            result[attribute_key] = dict(node.items())
-
-        # Handle children
-        for child in node:
-            child_value = self._xmltodict_recurse(child)
-            if child.tag not in result:
-                result[child.tag] = child_value
-            else:
-                # Convert to list if multiple same-named children
-                if not isinstance(result[child.tag], list):
-                    result[child.tag] = [result[child.tag]]
-                result[child.tag].append(child_value)
-
-        return result
-
-    def tinydicttoxml(self, dict_data: Dict[str, Any]) -> str:
-        """
-        Convert dictionary back to XML string.
-
-        Args:
-            dict_data: Dictionary to convert
-
-        Returns:
-            XML string
-        """
-        if not isinstance(dict_data, dict) or len(dict_data) > 1:
-            dict_data = {"root": dict_data}
-
-        root_tag = list(dict_data.keys())[0]
-        xml_root = ElementTree.Element(root_tag)
-        self._dicttoxml_recurse(xml_root, dict_data[root_tag])
-        return ElementTree.tostring(xml_root, encoding='unicode')
-
-    def _dicttoxml_recurse(self, node: ElementTree.Element, dict_data: Dict[str, Any]) -> None:
-        """Recursive helper for dict to XML conversion."""
-        attribute_key = "attributes"
-
-        if not isinstance(dict_data, dict):
-            return
-
-        for key, value in dict_data.items():
-            if key == attribute_key:
-                for attr_name, attr_value in value.items():
-                    node.set(attr_name, attr_value)
-            elif value is None:
-                ElementTree.SubElement(node, key)
-            elif isinstance(value, str):
-                new_node = ElementTree.SubElement(node, key)
-                new_node.text = value
-            elif isinstance(value, dict):
-                new_node = ElementTree.SubElement(node, key)
-                self._dicttoxml_recurse(new_node, value)
-            elif isinstance(value, list):
-                for item in value:
-                    if isinstance(item, dict):
-                        new_node = ElementTree.SubElement(node, key)
-                        self._dicttoxml_recurse(new_node, item)
-                    else:
-                        new_node = ElementTree.SubElement(node, key)
-                        new_node.text = str(item)
-
-    def formatxml(self, xml_data: str) -> str:
-        """
-        Format XML with proper indentation.
-
-        Args:
-            xml_data: XML string to format
-
-        Returns:
-            Formatted XML string
-        """
-        root = ElementTree.fromstring(xml_data)
-        self._format_element(root, level=0)
-        return ElementTree.tostring(root, encoding='unicode')
-
-    def _format_element(self, elem: ElementTree.Element, level: int) -> None:
-        """Recursively format XML element with indentation."""
-        indent = "\t"
-        i = "\n" + level * indent
-
-        if len(elem):
-            if not elem.text or not elem.text.strip():
-                elem.text = i + indent
-            for j, child in enumerate(elem):
-                self._format_element(child, level + 1)
-                if j < len(elem) - 1:
-                    child.tail = i + indent
-                else:
-                    child.tail = i
-        else:
-            if level and (not elem.tail or not elem.tail.strip()):
-                elem.tail = i
 
     # ============================================================
     # Munge Configuration
@@ -744,36 +578,13 @@ class ConfigManager:
             Result dictionary with status and messages
         """
         result = {'status': 'working', 'messages': []}
-        root = self.context.config_root
 
-        if root is None:
-            result['status'] = 'error'
-            result['messages'].append('No configuration loaded')
-            return result
-
-        # Find globalsettings
-        globalsettings = root.find('.//globalsettings')
-        if globalsettings is None:
-            result['status'] = 'error'
-            result['messages'].append('No globalsettings element found')
-            return result
-
-        # Get current munge config
-        munge_elem = root.find('.//munge')
-        if munge_elem is None:
-            if 'clear' in munge_input:
-                current_config = {'munge': {}}
-            else:
-                result['messages'].append('No munge config found. Creating new')
-                current_config = {'munge': munge_input}
-        else:
-            result['messages'].append('Existing munge config found. Editing')
-            current_config = self.tinyxmltodict(munge_elem)
-            globalsettings.remove(munge_elem)
+        current_config = self._config_data.get('munge', {})
 
         # Handle empty input (clear all)
         if munge_input == {}:
-            result['messages'].append('Terminating before XML rebuild to remove all munge config')
+            result['messages'].append('Clearing all munge config')
+            self._config_data['munge'] = {}
             self.context.config.munge_config = None
             self.context.config.to_munge = False
             result['status'] = 'OK'
@@ -784,8 +595,8 @@ class ConfigManager:
             clear_target = munge_input['clear']
             if isinstance(clear_target, str):
                 # Clear entire rule
-                if clear_target in current_config.get('munge', {}):
-                    del current_config['munge'][clear_target]
+                if clear_target in current_config:
+                    del current_config[clear_target]
                     result['messages'].append(f'Removed rule {clear_target}')
                 else:
                     result['messages'].append(f'Rule {clear_target} not found')
@@ -793,26 +604,24 @@ class ConfigManager:
                 # Clear specific step
                 rule_name = list(clear_target.keys())[0]
                 step_name = clear_target[rule_name]
-                if rule_name in current_config.get('munge', {}):
-                    if step_name in current_config['munge'][rule_name]:
-                        del current_config['munge'][rule_name][step_name]
+                if rule_name in current_config:
+                    if step_name in current_config[rule_name]:
+                        del current_config[rule_name][step_name]
                         result['messages'].append(f'Removed step {step_name} from rule {rule_name}')
         else:
             # Update/add rules
             for rule_name, rule_data in munge_input.items():
-                if rule_name in current_config.get('munge', {}):
+                if rule_name in current_config:
                     result['messages'].append(f'Updating rule {rule_name}')
-                    current_config['munge'][rule_name].update(rule_data)
+                    current_config[rule_name].update(rule_data)
                 else:
                     result['messages'].append(f'Creating rule {rule_name}')
-                    if 'munge' not in current_config:
-                        current_config['munge'] = {}
-                    current_config['munge'].update({rule_name: rule_data})
+                    current_config[rule_name] = rule_data
 
-        # Rebuild XML if there are rules
-        if current_config.get('munge'):
-            self._rebuild_munge_xml(globalsettings, current_config['munge'])
-            self.context.config.munge_config = current_config['munge']
+        self._config_data['munge'] = current_config
+
+        if current_config:
+            self.context.config.munge_config = current_config
             self.context.config.to_munge = True
         else:
             self.context.config.munge_config = None
@@ -820,57 +629,6 @@ class ConfigManager:
 
         result['status'] = 'OK'
         return result
-
-    def _rebuild_munge_xml(self, parent: ElementTree.Element, munge_config: Dict[str, Any]) -> None:
-        """Rebuild munge XML from config dictionary."""
-        munge = ElementTree.SubElement(parent, 'munge')
-
-        # Sort rules by numeric value
-        rule_names = sorted(
-            [k for k in munge_config.keys() if k.startswith('rule')],
-            key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else 0
-        )
-
-        for rule_name in rule_names:
-            rule_data = munge_config[rule_name]
-            rule = ElementTree.SubElement(munge, rule_name)
-
-            # Add match statement
-            match = ElementTree.SubElement(rule, 'match')
-            match_data = rule_data.get('match', {})
-            if 'any' in match_data:
-                ElementTree.SubElement(match, 'any')
-            else:
-                if 'regex' in match_data:
-                    regex_elem = ElementTree.SubElement(match, 'regex')
-                    regex_elem.text = match_data['regex']
-                if 'criterion' in match_data:
-                    criterion_elem = ElementTree.SubElement(match, 'criterion')
-                    criterion_elem.text = match_data['criterion']
-
-            # Add steps (sorted)
-            step_names = sorted(
-                [k for k in rule_data.keys() if k.startswith('step')],
-                key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else 0
-            )
-
-            for step_name in step_names:
-                step_data = rule_data[step_name]
-                step = ElementTree.SubElement(rule, step_name)
-
-                for action, value in step_data.items():
-                    if action == 'assemble' and isinstance(value, dict):
-                        assemble = ElementTree.SubElement(step, action)
-                        for var_name, var_value in value.items():
-                            var_elem = ElementTree.SubElement(assemble, var_name)
-                            var_elem.text = var_value
-                    elif action == 'from-match' and isinstance(value, dict):
-                        from_match = ElementTree.SubElement(step, action)
-                        ElementTree.SubElement(from_match, 'any')
-                    else:
-                        action_elem = ElementTree.SubElement(step, action)
-                        if value is not None:
-                            action_elem.text = str(value)
 
     def show_munge_as_set_commands(self) -> List[str]:
         """
@@ -880,64 +638,39 @@ class ConfigManager:
             List of CLI command strings
         """
         result = []
-        root = self.context.config_root
+        munge = self._config_data.get('munge', {})
 
-        if root is None:
-            return result
+        for rule_key, rule_data in sorted(munge.items()):
+            rule_num = rule_key.replace('rule', '') if rule_key.startswith('rule') else rule_key
 
-        globalsettings = root.find('.//globalsettings')
-        if globalsettings is None:
-            return result
-
-        munge = globalsettings.find('munge')
-        if munge is None:
-            return result
-
-        for rule in list(munge):
-            rule_num = rule.tag.replace('rule', '')
-
-            for step in rule:
-                if step.tag == 'match':
-                    children = list(step)
-                    if children and children[0].tag == 'any':
-                        result.append(f"set munge {rule_num}.0 match any")
-                    else:
-                        regex_elem = step.find('regex')
-                        criterion_elem = step.find('criterion')
-                        if regex_elem is not None and criterion_elem is not None:
-                            regex = regex_elem.text or ''
-                            # Escape backslashes for display
+            for step_key, step_data in sorted(rule_data.items()):
+                if step_key == 'match' or step_key.endswith('.0'):
+                    # Handle match statement
+                    if isinstance(step_data, dict):
+                        if step_data.get('any'):
+                            result.append(f"set munge {rule_num}.0 match any")
+                        else:
+                            regex = step_data.get('pattern', step_data.get('regex', ''))
                             regex = regex.replace('\\', '\\\\')
-                            criterion = criterion_elem.text or ''
-                            result.append(f'set munge {rule_num}.0 match "{regex}" {criterion}')
+                            matchtype = step_data.get('matchtype', step_data.get('criterion', ''))
+                            result.append(f'set munge {rule_num}.0 match "{regex}" {matchtype}')
                 else:
-                    step_num = step.tag.replace('step', '')
-                    children = list(step)
+                    step_num = step_key.replace('step', '') if step_key.startswith('step') else step_key
 
-                    for child in children:
-                        if child.tag in ('accept', 'discard'):
-                            result.append(f'set munge {rule_num}.{step_num} {child.tag}')
-                        elif child.tag == 'assemble':
-                            var_dict = {}
-                            for var in list(child):
-                                var_dict[var.tag] = var.text
-                            var_str = ' '.join(var_dict.values())
-                            result.append(f'set munge {rule_num}.{step_num} assemble {var_str}')
-                        elif child.tag == 'set-variable':
-                            var_name = child.text
-                            # Look for source
-                            from_match = step.find('from-match')
-                            from_string = step.find('from-string')
-                            if from_match is not None:
-                                if list(from_match):
-                                    result.append(f'set munge {rule_num}.{step_num} set-variable {var_name} from-match any')
-                                else:
-                                    source = from_match.text or ''
-                                    source = source.replace('\\', '\\\\')
-                                    result.append(f'set munge {rule_num}.{step_num} set-variable {var_name} from-match "{source}"')
-                            elif from_string is not None:
-                                source = from_string.text or ''
-                                result.append(f'set munge {rule_num}.{step_num} set-variable {var_name} from-string "{source}"')
+                    if isinstance(step_data, dict):
+                        action = step_data.get('action', '')
+                        if action in ('accept', 'discard'):
+                            result.append(f'set munge {rule_num}.{step_num} {action}')
+                        elif action == 'assemble':
+                            template = step_data.get('template', '')
+                            result.append(f'set munge {rule_num}.{step_num} assemble {template}')
+                        elif action == 'set-variable':
+                            var_name = step_data.get('variable', '')
+                            source_type = 'from-match' if 'pattern' in step_data else 'from-string'
+                            source = step_data.get('pattern', step_data.get('value', ''))
+                            source = source.replace('\\', '\\\\')
+                            result.append(
+                                f'set munge {rule_num}.{step_num} set-variable {var_name} {source_type} "{source}"')
 
         return result
 
@@ -954,9 +687,9 @@ class ConfigManager:
         cfg = self.context.config
         lines = []
 
-        lines.append(f"####################################################")
-        lines.append(f"#### Set Commands to configure RadiUID ####")
-        lines.append(f"####################################################")
+        lines.append("####################################################")
+        lines.append("#### Set Commands to configure RadiUID ####")
+        lines.append("####################################################")
         lines.append("!")
 
         # Global settings
@@ -1003,3 +736,248 @@ class ConfigManager:
         lines.append("####################################################")
 
         return "\n".join(lines)
+
+    # ============================================================
+    # XML Migration Support
+    # ============================================================
+
+    def _migrate_xml_to_yaml(self, xml_content: str) -> Dict[str, Any]:
+        """
+        Migrate XML configuration to YAML format.
+
+        Args:
+            xml_content: XML configuration content
+
+        Returns:
+            Dictionary representation suitable for YAML
+        """
+        from xml.etree import ElementTree
+
+        # Remove XML comments
+        comment_regex = r"(?s)<!--.*?-->"
+        cleaned_xml = re.sub(comment_regex, "", xml_content)
+
+        try:
+            root = ElementTree.fromstring(cleaned_xml)
+        except ElementTree.ParseError as e:
+            logger.error(f"Failed to parse XML configuration: {e}")
+            return DEFAULT_CONFIG.copy()
+
+        config = DEFAULT_CONFIG.copy()
+
+        # Extract global settings
+        gs = root.find('.//globalsettings')
+        if gs is not None:
+            # Paths
+            paths = gs.find('paths')
+            if paths is not None:
+                if paths.find('radiuslogpath') is not None:
+                    config['paths']['radius_log_path'] = paths.find('radiuslogpath').text or ''
+                if paths.find('logfile') is not None:
+                    config['paths']['log_file'] = paths.find('logfile').text or ''
+                if paths.find('acctlogcopypath') is not None:
+                    text = paths.find('acctlogcopypath').text
+                    config['paths']['acct_log_copy_path'] = text if text else None
+
+            # Logging
+            logging_elem = gs.find('logging')
+            if logging_elem is not None:
+                if logging_elem.find('maxloglines') is not None:
+                    text = logging_elem.find('maxloglines').text
+                    config['logging']['max_log_lines'] = int(text) if text else 0
+
+            # UID Settings
+            uid = gs.find('uidsettings')
+            if uid is not None:
+                if uid.find('userdomain') is not None:
+                    config['uid_settings']['user_domain'] = uid.find('userdomain').text or ''
+                if uid.find('timeout') is not None:
+                    text = uid.find('timeout').text
+                    config['uid_settings']['timeout'] = int(text) if text else 60
+
+            # Search Terms
+            st = gs.find('searchterms')
+            if st is not None:
+                if st.find('ipaddressterm') is not None:
+                    config['search_terms']['ip_address_term'] = st.find('ipaddressterm').text or ''
+                if st.find('usernameterm') is not None:
+                    config['search_terms']['username_term'] = st.find('usernameterm').text or ''
+                if st.find('delineatorterm') is not None:
+                    config['search_terms']['delineator_term'] = st.find('delineatorterm').text or ''
+
+            # Misc
+            misc = gs.find('misc')
+            if misc is not None:
+                if misc.find('looptime') is not None:
+                    text = misc.find('looptime').text
+                    config['misc']['loop_time'] = int(text) if text else 10
+                if misc.find('tlsversion') is not None:
+                    config['misc']['tls_version'] = misc.find('tlsversion').text or '1.2'
+                if misc.find('radiusstopaction') is not None:
+                    config['misc']['radius_stop_action'] = misc.find('radiusstopaction').text or 'clear'
+
+            # Live log
+            livelog = gs.find('livelog')
+            if livelog is not None:
+                if livelog.find('enabled') is not None:
+                    text = livelog.find('enabled').text or 'false'
+                    config['livelog']['enabled'] = text.lower() in ('true', '1', 'yes', 'on')
+                if livelog.find('file') is not None:
+                    config['livelog']['file'] = livelog.find('file').text
+                if livelog.find('tracker') is not None:
+                    config['livelog']['tracker'] = livelog.find('tracker').text
+
+            # Munge (simplified migration - complex rules may need manual adjustment)
+            munge_elem = gs.find('munge')
+            if munge_elem is not None:
+                munge_dict = self._migrate_munge_xml(munge_elem)
+                config['munge'] = munge_dict
+
+        # Extract targets
+        targets_dict = {}
+        for target in root.findall('.//target'):
+            hostname_elem = target.find('hostname')
+            vsys_elem = target.find('vsys')
+            username_elem = target.find('username')
+            password_elem = target.find('password')
+            port_elem = target.find('port')
+
+            if hostname_elem is not None:
+                hostname = hostname_elem.text or ''
+                vsys = vsys_elem.text if vsys_elem is not None else '1'
+                key = f"{hostname}:{vsys}"
+
+                targets_dict[key] = {
+                    'hostname': hostname,
+                    'vsys': vsys,
+                    'username': username_elem.text if username_elem is not None else '',
+                    'password': password_elem.text if password_elem is not None else '',
+                    'port': port_elem.text if port_elem is not None else '443',
+                }
+
+        config['targets'] = targets_dict
+
+        return config
+
+    def _migrate_munge_xml(self, munge_elem) -> Dict[str, Any]:
+        """Migrate munge XML element to dictionary."""
+        munge_dict = {}
+
+        for rule in list(munge_elem):
+            rule_name = rule.tag
+            rule_dict = {}
+
+            for elem in list(rule):
+                if elem.tag == 'match':
+                    match_dict = {}
+                    any_elem = elem.find('any')
+                    if any_elem is not None:
+                        match_dict['any'] = True
+                    else:
+                        regex_elem = elem.find('regex')
+                        criterion_elem = elem.find('criterion')
+                        if regex_elem is not None:
+                            match_dict['pattern'] = regex_elem.text or ''
+                        if criterion_elem is not None:
+                            match_dict['matchtype'] = criterion_elem.text or ''
+                    rule_dict['match'] = match_dict
+                else:
+                    # Step elements
+                    step_dict = {}
+                    for child in list(elem):
+                        if child.tag in ('accept', 'discard'):
+                            step_dict['action'] = child.tag
+                        elif child.tag == 'set-variable':
+                            step_dict['action'] = 'set-variable'
+                            step_dict['variable'] = child.text or ''
+                        elif child.tag == 'from-match':
+                            if list(child):  # has children (like <any>)
+                                step_dict['pattern'] = 'any'
+                            else:
+                                step_dict['pattern'] = child.text or ''
+                        elif child.tag == 'from-string':
+                            step_dict['value'] = child.text or ''
+                        elif child.tag == 'assemble':
+                            step_dict['action'] = 'assemble'
+                            parts = []
+                            for var in list(child):
+                                parts.append(var.text or '')
+                            step_dict['template'] = ' '.join(parts)
+                    rule_dict[elem.tag] = step_dict
+
+            munge_dict[rule_name] = rule_dict
+
+        return munge_dict
+
+    # ============================================================
+    # Legacy Compatibility Methods
+    # ============================================================
+
+    def tinyxmltodict(self, input_data) -> Dict[str, Any]:
+        """
+        Legacy method for XML to dict conversion.
+        Kept for backward compatibility with other modules.
+        """
+        from xml.etree import ElementTree
+
+        if isinstance(input_data, str):
+            if "<" not in input_data:
+                with open(input_data, 'r') as f:
+                    xml_data = f.read()
+                root = ElementTree.fromstring(xml_data)
+            else:
+                root = ElementTree.fromstring(input_data)
+        elif isinstance(input_data, ElementTree.Element):
+            root = input_data
+        else:
+            xml_str = ElementTree.tostring(input_data, encoding='unicode')
+            root = ElementTree.fromstring(xml_str)
+
+        return {root.tag: self._xmltodict_recurse(root)}
+
+    def _xmltodict_recurse(self, node) -> Any:
+        """Recursive helper for XML to dict conversion."""
+
+        if len(list(node)) == 0 and len(node.items()) == 0:
+            return node.text
+
+        result = {}
+
+        if len(node.items()) > 0:
+            result['attributes'] = dict(node.items())
+
+        for child in node:
+            child_value = self._xmltodict_recurse(child)
+            if child.tag not in result:
+                result[child.tag] = child_value
+            else:
+                if not isinstance(result[child.tag], list):
+                    result[child.tag] = [result[child.tag]]
+                result[child.tag].append(child_value)
+
+        return result
+
+    def formatxml(self, xml_data: str) -> str:
+        """Legacy method for XML formatting."""
+        from xml.etree import ElementTree
+        root = ElementTree.fromstring(xml_data)
+        self._format_element(root, level=0)
+        return ElementTree.tostring(root, encoding='unicode')
+
+    def _format_element(self, elem, level: int) -> None:
+        """Recursively format XML element with indentation."""
+        indent = "\t"
+        i = "\n" + level * indent
+
+        if len(elem):
+            if not elem.text or not elem.text.strip():
+                elem.text = i + indent
+            for j, child in enumerate(elem):
+                self._format_element(child, level + 1)
+                if j < len(elem) - 1:
+                    child.tail = i + indent
+                else:
+                    child.tail = i
+        else:
+            if level and (not elem.tail or not elem.tail.strip()):
+                elem.tail = i

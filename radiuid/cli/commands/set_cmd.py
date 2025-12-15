@@ -5,7 +5,6 @@ Handles all 'set' CLI commands for RadiUID
 """
 
 import os
-import sys
 import re
 import time
 from typing import TYPE_CHECKING, List
@@ -115,7 +114,7 @@ def handle(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
             _set_livelog(cli, arguments, args_list)
 
 
-def _show_help(cli: 'CLIRouter') -> None:
+def _show_help(_cli: 'CLIRouter') -> None:
     """Show help for set commands"""
     print("\n - set logfile <file path>                       |     Set the RadiUID logfile path")
     print(" - set radiuslogpath <directory path>            |     Set the path used to find FreeRADIUS accounting log files")

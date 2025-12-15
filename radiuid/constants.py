@@ -10,15 +10,20 @@ VERSION = "v3.0.0"
 # File Paths
 class Paths:
     """System file paths"""
-    ETC_CONFIG_FILE = '/etc/radiuid/radiuid.conf'
+    ETC_CONFIG_FILE = '/etc/radiuid/radiuid.yaml'
     RADDB_CLIENTS = '/etc/raddb/clients.conf'
     FREERADIUS_CLIENTS = '/etc/freeradius/clients.conf'
 
 # Limits and Thresholds
 class Limits:
     """System limits and thresholds"""
-    MAX_TIMEOUT = 1440  # Maximum timeout in minutes
-    MAX_UIDS_PER_CALL = 50  # Maximum UIDs to send per API call
+    # 1440 minutes = 24 hours, matches Palo Alto default User-ID TTL
+    # This is how long mappings persist on the firewall before auto-expiring
+    MAX_TIMEOUT = 1440
+
+    # Palo Alto User-ID API enforces a limit of 50 UIDs per API call
+    # Larger batches must be split into multiple requests
+    MAX_UIDS_PER_CALL = 50
 
 # Service Names
 class Services:

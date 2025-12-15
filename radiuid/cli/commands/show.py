@@ -5,7 +5,6 @@ Handles all 'show' CLI commands for RadiUID
 """
 
 import os
-import sys
 import re
 from typing import TYPE_CHECKING, List
 from xml.etree import ElementTree
@@ -84,7 +83,7 @@ def handle(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
             return
 
 
-def _show_help(cli: 'CLIRouter') -> None:
+def _show_help(_cli: 'CLIRouter') -> None:
     """Show help for show commands"""
     print("\n - show log                                                  |     Show the RadiUID log file")
     print(" - show acct-logs                                            |     Show the log files currently in the FreeRADIUS accounting directory")
@@ -96,7 +95,7 @@ def _show_help(cli: 'CLIRouter') -> None:
     print(" - show mappings (<hostname>:<vsys-id> | all | consistency)  |     Show the current IP-to-User mappings of one or all targets or check consistency\n")
 
 
-def _show_config_help(cli: 'CLIRouter') -> None:
+def _show_config_help(_cli: 'CLIRouter') -> None:
     """Show help for show config command"""
     print("\n - show config (xml | set)  |   Show the RadiUID configuration in XML format (default) or as set commands")
     print("                            |  ")
@@ -105,7 +104,7 @@ def _show_config_help(cli: 'CLIRouter') -> None:
     print("                            |             'show config set'\n")
 
 
-def _show_run_help(cli: 'CLIRouter') -> None:
+def _show_run_help(_cli: 'CLIRouter') -> None:
     """Show help for show run command"""
     print("\n - show run (xml | set)  |   Show the RadiUID configuration in XML format (default) or as set commands")
     print("                         |  ")
@@ -114,7 +113,7 @@ def _show_run_help(cli: 'CLIRouter') -> None:
     print("                         |             'show run set'\n")
 
 
-def _show_mappings_help(cli: 'CLIRouter') -> None:
+def _show_mappings_help(_cli: 'CLIRouter') -> None:
     """Show help for show mappings command"""
     print("\n - show mappings (<hostname>:<vsys-id> | all | consistency)  |   Show the current IP-to-User mappings of one or all targets or")
     print("                                                             |    check the consistency of IP-to-User mappings in all targets")

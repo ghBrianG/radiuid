@@ -5,12 +5,12 @@ Centralized state management replacing global variables
 """
 
 import ssl
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from xml.etree import ElementTree
 
-from .system_info import get_system_info, SystemInfo
 from .logging_config import get_logger
+from .system_info import get_system_info, SystemInfo
 
 logger = get_logger('context')
 
@@ -71,7 +71,7 @@ class RadiUIDConfig:
 
     # UID Settings
     user_domain: Optional[str] = None
-    timeout: int = 60
+    timeout: int = 60  # Minutes until User-ID mapping expires on firewall
 
     # Misc
     loop_time: int = 10
@@ -91,6 +91,15 @@ class RadiUIDConfig:
     live_log_file: Optional[str] = None  # Path to live log file being written to
     live_log_tracker: Optional[str] = None  # Path to position tracker file
     live_log_enabled: bool = False  # Whether to use live log processing
+
+    # NPS CSV parsing settings (0-based column indices)
+    # Set to -1 to enable auto-detection using RADIUS attribute numbers
+    nps_ip_column: int = 0  # Column with IP (or -1 to find attr 8/4108)
+    nps_username_column: int = 1  # Column with username (or -1 to find attr 1/4129)
+    nps_packet_type_column: int = 6  # Column with packet type code
+
+    # Max UIDs per API call
+    max_uids_per_call: int = 50
 
     @property
     def tls_protocol(self) -> Optional[int]:

@@ -151,5 +151,10 @@ $RECYCLE.BIN/
 examples/*.log
 example/
 
-# Local config overrides
+# Local/personal config files (may contain passwords)
+radiuid.local.yaml
 radiuid.local.conf
+*-mine.yaml
+*-mine.conf
+examples/*-mine.yaml
+examples/*-mine.conf
