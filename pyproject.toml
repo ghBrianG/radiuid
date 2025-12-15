@@ -7,7 +7,7 @@ name = "radiuid"
 version = "3.0.0"
 description = "RADIUS to Palo Alto User-ID mapping service"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "John W Kerns", email = "packetsar@gmail.com"}
 ]
@@ -28,7 +28,6 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: System Administrators",
     "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
