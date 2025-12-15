@@ -82,6 +82,10 @@ def handle(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
         _show_livelog_help()
         return
 
+    if arguments in ("set nps", "set nps ?"):
+        _show_nps_help()
+        return
+
     # Actual set commands
     if len(args_list) >= 3:
         cmd = cli.cat_list(args_list[:2])
@@ -114,6 +118,8 @@ def handle(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
             _set_munge(cli, arguments, args_list)
         elif cmd == "set livelog":
             _set_livelog(cli, arguments, args_list)
+        elif cmd == "set nps":
+            _set_nps(cli, arguments, args_list)
 
 
 def _show_help(_cli: 'CLIRouter') -> None:
@@ -131,7 +137,9 @@ def _show_help(_cli: 'CLIRouter') -> None:
     print(" - set client (ipv4|ipv6) <ip-block> <secret>    |     Set configuration elements for RADIUS clients to send accounting data FreeRADIUS")
     print(" - set munge <rule>.<step> [parameters]          |     Set munge (string processing rules) for User-IDs")
     print(" - set target <hostname>:<vsys-id> [parameters]  |     Set configuration elements for existing or new firewall targets")
-    print(" - set livelog <option> <value>                  |     Configure live log file processing (for NPS logs)\n")
+    print(" - set livelog <option> <value>                  |     Configure live log file processing (for NPS logs)")
+    print(
+        " - set nps <option> <value>                      |     Set NPS CSV column indices (ip-column, username-column, packet-type-column)\n")
 
 
 def _show_target_help() -> None:
@@ -345,7 +353,9 @@ def _set_acctlogcopypath(cli: 'CLIRouter', arguments: str, args_list: List[str])
             print(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   <acctlogcopypath> configuration element changed to :\n")
             cli.config_manager.show_config_item('xml', "none", 'acctlogcopypath')
 
-        if cli.config_manager.get_config_item('acctlogcopypath') == value:
+        # Check success - compare against config_value (None if "none" was entered)
+        expected_value = None if value.lower() == "none" else value
+        if cli.config_manager.get_config_item('acctlogcopypath') == expected_value:
             cli.print_success()
         else:
             cli.print_failure()
@@ -386,7 +396,9 @@ def _set_xmloutputpath(cli: 'CLIRouter', arguments: str, args_list: List[str]) -
             print(f"{time.strftime('%Y-%m-%d %H:%M:%S')}:   <xmloutputpath> configuration element changed to :\n")
             cli.config_manager.show_config_item('xml', "none", 'xmloutputpath')
 
-        if cli.config_manager.get_config_item('xmloutputpath') == value:
+        # Check success - compare against config_value (None if "none" was entered)
+        expected_value = None if value.lower() == "none" else value
+        if cli.config_manager.get_config_item('xmloutputpath') == expected_value:
             cli.print_success()
         else:
             cli.print_failure()
@@ -928,6 +940,88 @@ def _set_livelog(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None
         else:
             print(cli.ui.color(f"\n\nUnknown option '{option}'. Use 'set livelog ?' for help", cli.ui.red))
             keepgoing = False
+
+    print("\n")
+    if keepgoing:
+        cli.print_success()
+    else:
+        cli.print_failure()
+
+    print_footer(cli, header)
+
+
+def _show_nps_help() -> None:
+    """Show help for set nps command"""
+    print("\n - set nps <option> <value>  |  Set NPS CSV column indices for parsing NPS/IAS log files")
+    print("                             |")
+    print(
+        "                             |  Options:  ip-column <number>          - Column index for IP address (0-indexed, -1 for auto)")
+    print(
+        "                             |            username-column <number>    - Column index for username (0-indexed, -1 for auto)")
+    print(
+        "                             |            packet-type-column <number> - Column index for packet type (0-indexed)")
+    print("                             |")
+    print("                             |  Examples: 'set nps ip-column 5'")
+    print("                             |            'set nps username-column 1'")
+    print("                             |            'set nps packet-type-column 25'")
+    print("                             |            'set nps ip-column -1'  (enable auto-detection)\n")
+
+
+def _set_nps(cli: 'CLIRouter', arguments: str, args_list: List[str]) -> None:
+    """Set NPS CSV column settings"""
+    cli._log_command(arguments)
+    header = print_header(cli, f"EXECUTING COMMAND: {arguments}")
+
+    keepgoing = True
+
+    if len(args_list) < 4:
+        print(cli.ui.color("\n\nError: Missing parameters. Use 'set nps ?' for help", cli.ui.red))
+        keepgoing = False
+    else:
+        option = args_list[2].lower()
+        value = args_list[3]
+
+        # Validate the value is an integer
+        try:
+            int_value = int(value)
+        except ValueError:
+            print(cli.ui.color(f"\n\nError: Value must be an integer, got '{value}'", cli.ui.red))
+            keepgoing = False
+            int_value = None
+
+        if keepgoing and int_value is not None:
+            if option == "ip-column":
+                if int_value < -1:
+                    print(cli.ui.color("\n\nError: Column index must be -1 (auto) or >= 0", cli.ui.red))
+                    keepgoing = False
+                else:
+                    cli.config_manager.change_config_item("nps", "ip_column", int_value)
+                    cli.config_manager.save()
+                    mode = "(auto-detect)" if int_value == -1 else ""
+                    print(f"\nNPS IP column set to: {int_value} {mode}")
+
+            elif option == "username-column":
+                if int_value < -1:
+                    print(cli.ui.color("\n\nError: Column index must be -1 (auto) or >= 0", cli.ui.red))
+                    keepgoing = False
+                else:
+                    cli.config_manager.change_config_item("nps", "username_column", int_value)
+                    cli.config_manager.save()
+                    mode = "(auto-detect)" if int_value == -1 else ""
+                    print(f"\nNPS username column set to: {int_value} {mode}")
+
+            elif option == "packet-type-column":
+                if int_value < 0:
+                    print(cli.ui.color("\n\nError: Packet type column must be >= 0", cli.ui.red))
+                    keepgoing = False
+                else:
+                    cli.config_manager.change_config_item("nps", "packet_type_column", int_value)
+                    cli.config_manager.save()
+                    print(f"\nNPS packet type column set to: {int_value}")
+
+            else:
+                print(cli.ui.color(f"\n\nUnknown option '{option}'. Use 'set nps ?' for help", cli.ui.red))
+                keepgoing = False
 
     print("\n")
     if keepgoing:

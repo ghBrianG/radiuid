@@ -48,7 +48,7 @@ DEFAULT_CONFIG = {
         'file': None,
         'tracker': '/var/lib/radiuid/livelog_tracker',
     },
-    'nps_csv': {
+    'nps': {
         'ip_column': 0,
         'username_column': 1,
         'packet_type_column': 6,
@@ -250,12 +250,12 @@ class ConfigManager:
             # NPS CSV parsing settings (column indices are 0-based)
             # Set column to -1 or null to enable auto-detection mode, which uses
             # RADIUS attribute numbers in the CSV to find IP/username fields
-            nps_csv = data.get('nps_csv', {})
-            ip_col = nps_csv.get('ip_column', 0)
+            nps = data.get('nps', {})
+            ip_col = nps.get('ip_column', 0)
             cfg.nps_ip_column = int(ip_col) if ip_col is not None else -1
-            username_col = nps_csv.get('username_column', 1)
+            username_col = nps.get('username_column', 1)
             cfg.nps_username_column = int(username_col) if username_col is not None else -1
-            pkt_col = nps_csv.get('packet_type_column', 6)
+            pkt_col = nps.get('packet_type_column', 6)
             cfg.nps_packet_type_column = int(pkt_col) if pkt_col is not None else -1
 
             if mode == 'noisy':
@@ -343,10 +343,10 @@ class ConfigManager:
         self._config_data['livelog']['tracker'] = cfg.live_log_tracker
 
         # NPS CSV settings
-        self._config_data.setdefault('nps_csv', {})
-        self._config_data['nps_csv']['ip_column'] = cfg.nps_ip_column
-        self._config_data['nps_csv']['username_column'] = cfg.nps_username_column
-        self._config_data['nps_csv']['packet_type_column'] = cfg.nps_packet_type_column
+        self._config_data.setdefault('nps', {})
+        self._config_data['nps']['ip_column'] = cfg.nps_ip_column
+        self._config_data['nps']['username_column'] = cfg.nps_username_column
+        self._config_data['nps']['packet_type_column'] = cfg.nps_packet_type_column
 
         # Munge
         self._config_data['munge'] = cfg.munge_config or {}

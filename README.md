@@ -22,16 +22,17 @@ This is a fork of the [original RadiUID project](https://github.com/PackeTsar/ra
 5. [Tested Environments](#tested-environments)
 6. [Docker Install Instructions](#docker-install-instructions)
 7. [OS Install Instructions](#os-install-instructions)
-8. [Command Interface](#command-interface)
-9. [Timeout Tuning](#timeout-tuning)
-10. [The Munge Engine](#the-munge-engine)
-11. [NPS/Windows Log Support](#npswindows-log-support)
-12. [Live Log Processing](#live-log-processing)
-13. [Network Mount Dependencies](#network-mount-dependencies)
-14. [Updates](#updates)
-15. [Upgrade Processes](#upgrade-processes)
-16. [Docker Files](#dockerfiles)
-17. [Contributing](#contributing)
+8. [Pip/Wheel Installation](#pipwheel-installation)
+9. [Command Interface](#command-interface)
+10. [Timeout Tuning](#timeout-tuning)
+11. [The Munge Engine](#the-munge-engine)
+12. [NPS/Windows Log Support](#npswindows-log-support)
+13. [Live Log Processing](#live-log-processing)
+14. [Network Mount Dependencies](#network-mount-dependencies)
+15. [Updates](#updates)
+16. [Upgrade Processes](#upgrade-processes)
+17. [Docker Files](#dockerfiles)
+18. [Contributing](#contributing)
 
 
 -----------------------------------------
@@ -71,6 +72,7 @@ $ radiuid
  - show log                                       |  Show the RadiUID log file
  - show acct-logs                                 |  Show the log files in the FreeRADIUS accounting directory
  - show livelog                                   |  Show the live log file settings
+ - show nps                                       |  Show the NPS CSV column settings
  - show config (yaml | set)                       |  Show the RadiUID configuration
  - show clients (file | table)                    |  Show the FreeRADIUS clients
  - show status                                    |  Show the RadiUID and FreeRADIUS service statuses
@@ -265,6 +267,91 @@ NOTE: You need to be logged in as root or have sudo privileges on the system to 
 6. Follow the on-screen prompts to install FreeRADIUS and the RadiUID application.
 	- The installer should indicate whether everything was installed correctly and services are running. In the next section, you will find CLI commands you can run to check on it.
 
+----------------------------------------------
+
+## PIP/WHEEL INSTALLATION
+
+RadiUID v3.0.0 can be installed using pip and a wheel file. This is the recommended method for production deployments as
+it provides better isolation and easier upgrades.
+
+**Building the Wheel File:**
+
+If you have the source code and need to build the wheel:
+
+```bash
+# Install build tools
+pip3 install build
+
+# Build the wheel (creates dist/radiuid-3.0.0-py3-none-any.whl)
+python3 -m build
+```
+
+**Installing with a Virtual Environment (Recommended):**
+
+Using a virtual environment isolates RadiUID from system Python packages and avoids conflicts.
+
+```bash
+# Create a virtual environment at /opt/radiuid
+sudo python3 -m venv /opt/radiuid
+
+# Install the wheel file
+sudo /opt/radiuid/bin/pip install radiuid-3.0.0-py3-none-any.whl
+
+# Verify installation
+/opt/radiuid/bin/radiuid version
+```
+
+**Creating a Symlink for Easy Access:**
+
+```bash
+# Create symlink so 'radiuid' works from anywhere
+sudo ln -sf /opt/radiuid/bin/radiuid /usr/local/bin/radiuid
+
+# Now you can run radiuid directly
+radiuid version
+```
+
+**Installing the Service:**
+
+After pip installation, you need to install the systemd service:
+
+```bash
+# Run the installer to set up the service and config
+sudo /opt/radiuid/bin/radiuid install
+
+# Or do a quick reinstall if config already exists
+sudo /opt/radiuid/bin/radiuid request reinstall keep-config
+```
+
+**Upgrading:**
+
+To upgrade to a new version:
+
+```bash
+# Stop the service
+sudo systemctl stop radiuid
+
+# Install the new wheel (use --force-reinstall to ensure clean upgrade)
+sudo /opt/radiuid/bin/pip install radiuid-3.1.0-py3-none-any.whl --force-reinstall
+
+# Reinstall service files (keeps your config)
+sudo radiuid request reinstall keep-config
+
+# Restart the service
+sudo systemctl start radiuid
+```
+
+**Direct pip Install (Alternative):**
+
+You can also install directly from the source directory:
+
+```bash
+# From the radiuid source directory
+sudo /opt/radiuid/bin/pip install .
+
+# Or install in development mode (changes take effect immediately)
+sudo /opt/radiuid/bin/pip install -e .
+```
 
 ----------------------------------------------
 ## COMMAND INTERFACE
@@ -287,6 +374,7 @@ Below is the CLI guide for the RadiUID service.
  - show log                                       |  Show the RadiUID log file
  - show acct-logs                                 |  Show the log files currently in the FreeRADIUS accounting directory
  - show livelog                                   |  Show the current live log processing settings and status
+ - show nps                                       |  Show the NPS CSV column settings (ip, username, packet-type)
  - show run (yaml | set)                          |  Show the RadiUID configuration in YAML format (default) or as `set` commands
  - show config (yaml | set)                       |  Show the RadiUID configuration in YAML format (default) or as `set` commands
  - show clients (file | table)                    |  Show the FreeRADIUS clients and the config file
@@ -307,6 +395,9 @@ Below is the CLI guide for the RadiUID service.
  - set munge <rule>.<step> [parameters]           |  Set munge (string-processing rules) for User-IDs
  - set target <hostname>:<vsys-id> [parameters]   |  Set configuration elements for existing or new firewall targets
  - set livelog <option> <value>                   |  Configure live log file processing (file, tracker, enabled)
+ - set nps ip-column <number>                     |  Set NPS CSV column index for IP address (0-indexed, -1 for auto)
+ - set nps username-column <number>               |  Set NPS CSV column index for username (0-indexed, -1 for auto)
+ - set nps packet-type-column <number>            |  Set NPS CSV column index for packet type (0-indexed)
 -------------------------------------------------------------------------------------------------------------------------------
 
  - push (<hostname>:<vsys-id> | all) [parameters] |  Manually push a User-ID mapping to one or all firewall targets
@@ -418,6 +509,39 @@ Version 3.0.0 adds support for Windows NPS (Network Policy Server) and IAS log f
 
 RadiUID will skip records that don't have both a username and an IP address.
 
+**Configuring NPS CSV Column Positions:**
+
+For NPS CSV logs, you can configure which columns contain the IP address, username, and packet type. This is useful when
+your NPS logs have a non-standard format or when the IP address is in a different column than expected.
+
+```bash
+# View current NPS settings
+radiuid show nps
+
+# Set column indices (0-indexed)
+radiuid set nps ip-column 39           # Column containing the client IP
+radiuid set nps username-column 1      # Column containing the username
+radiuid set nps packet-type-column 7   # Column containing the packet type
+
+# Use -1 to enable auto-detection (looks for RADIUS attribute numbers)
+radiuid set nps ip-column -1
+radiuid set nps username-column -1
+```
+
+**Example NPS CSV with Column Numbers:**
+
+```
+Col 0       Col 1   Col 2       Col 3     ...  Col 38  Col 39
+10.1.75.64, mainc,  12/15/2025, 13:18:50, ..., 8,      10.1.16.142, ...
+(NAS IP)    (User)  (Date)      (Time)         (Attr)  (Client IP)
+```
+
+In this example:
+
+- Column 0 is the NAS/Access Point IP (not the user's IP)
+- Column 1 is the username
+- Column 39 is the actual client IP (Framed-IP-Address, attribute 8)
+- Column 7 contains the packet type (Acct-Status-Type)
 
 --------------------------------------
 ## LIVE LOG PROCESSING

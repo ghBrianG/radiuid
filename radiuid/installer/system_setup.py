@@ -17,13 +17,51 @@ from ..ui.interface import UserInterface
 logger = get_logger('system_setup')
 
 
-def generate_systemd_service(mount_point: str = None) -> str:
+def find_radiuid_executable() -> str:
+    """
+    Find the radiuid executable path.
+
+    Checks common locations in order of preference:
+    1. Virtual environment at /opt/radiuid
+    2. /usr/local/bin (pip install)
+    3. /usr/bin
+    4. Current Python's bin directory
+
+    Returns:
+        The path to the radiuid executable
+    """
+    import shutil
+    import sys
+
+    # Check common locations in order of preference
+    candidates = [
+        '/opt/radiuid/bin/radiuid',  # Recommended venv location
+        '/usr/local/bin/radiuid',  # System pip install
+        '/usr/bin/radiuid',  # System package
+        shutil.which('radiuid'),  # Search PATH
+    ]
+
+    # Also check the bin directory of the current Python interpreter
+    python_bin_dir = os.path.dirname(sys.executable)
+    candidates.append(os.path.join(python_bin_dir, 'radiuid'))
+
+    for path in candidates:
+        if path and os.path.isfile(path):
+            return path
+
+    # Fallback to /opt/radiuid/bin/radiuid as the recommended default
+    return '/opt/radiuid/bin/radiuid'
+
+
+def generate_systemd_service(mount_point: str = None, radiuid_bin: str = None) -> str:
     """
     Generate the systemd service file content.
 
     Args:
         mount_point: An optional mount point path (e.g., /mnt/accountinglogs).
                     If provided, adds the mount dependencies to the service file.
+        radiuid_bin: Optional path to the radiuid executable. If not provided,
+                    will attempt to auto-detect.
 
     Returns:
         The service file content as a string
@@ -41,11 +79,16 @@ def generate_systemd_service(mount_point: str = None) -> str:
         mount_requires = ""
         mount_requires_for = ""
 
+    # Find the radiuid executable if not provided
+    if radiuid_bin is None:
+        radiuid_bin = find_radiuid_executable()
+
     template = read_template('radiuid.service.template')
     return template.format(
         mount_after=mount_after,
         mount_requires=mount_requires,
-        mount_requires_for=mount_requires_for
+        mount_requires_for=mount_requires_for,
+        radiuid_bin=radiuid_bin
     )
 
 class ServiceController:
